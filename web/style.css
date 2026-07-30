@@ -553,3 +553,91 @@ input:checked + .slider::before { transform: translateX(18px); }
 }
 
 .result-card .btn { margin-top: 22px; }
+
+/* ===== Eval bar: ai đang thắng, hiểu được không cần biết cờ ===== */
+.eval-bar-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.eval-bar {
+    position: relative;
+    width: 22px;
+    height: 420px;
+    border-radius: 11px;
+    overflow: hidden;
+    background: #0f172a;
+    border: 1px solid var(--border-color);
+}
+
+/* Nửa dưới = Đỏ, nửa trên = Đen. Chiều cao phần Đỏ biểu thị ưu thế của Đỏ. */
+.eval-bar-fill {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 50%;
+    background: linear-gradient(180deg, #ef4444, #b91c1c);
+    transition: height 0.5s ease;
+}
+
+.eval-bar-midline {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.eval-value {
+    font-size: 12px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ===== Badge chất lượng nước đi: tạo cao trào tức thì ===== */
+.quality-badge {
+    display: none;
+    padding: 5px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    margin-top: 6px;
+    text-align: center;
+}
+
+.quality-badge.visible { display: block; }
+
+.quality-badge.q-best     { background: #7c3aed; color: #fff; }
+.quality-badge.q-good     { background: #15803d; color: #fff; }
+.quality-badge.q-fair     { background: #166534; color: #d1fae5; }
+.quality-badge.q-inaccuracy { background: #a16207; color: #fff; }
+.quality-badge.q-mistake  { background: #c2410c; color: #fff; }
+.quality-badge.q-blunder  {
+    background: #b91c1c;
+    color: #fff;
+    animation: blunder-pop 0.5s ease-out;
+}
+
+@keyframes blunder-pop {
+    0%   { transform: scale(0.6); opacity: 0; }
+    60%  { transform: scale(1.15); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.accuracy-line {
+    font-size: 12px;
+    font-weight: 700;
+    margin-top: 4px;
+}
+
+.analysis-warning {
+    font-size: 11px;
+    color: #fbbf24;
+    text-align: center;
+    margin-top: 4px;
+}

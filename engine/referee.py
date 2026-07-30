@@ -7,10 +7,18 @@ hoàn toàn không đưa được nước hợp lệ.
 """
 
 from engine.ai_agent import AIAgent
+from engine.analysis import PikafishEngine, average_accuracy, score_move
 from engine.xiangqi import STATUS_DRAW, STATUS_ONGOING, XiangqiBoard
 
 MAX_MOVE_ATTEMPTS = 3
 REFEREE_LOG_LIMIT = 200
+
+# Ngưỡng cp_loss để trọng tài bình luận nước dở — dùng làm cao trào cho video
+BLUNDER_COMMENT_THRESHOLD = 500
+
+# Phân biệt "không truyền engine -> tự tạo" với "truyền None -> tắt chấm điểm hẳn"
+# (tắt chấm điểm cần cho test và cho chế độ chạy giải đấu nhanh).
+AUTO_ANALYSIS_ENGINE = object()
 
 DEFAULT_RED_CONFIG = {"name": "ChatGPT (Đỏ)", "provider": "mock", "model": "mock-red"}
 DEFAULT_BLACK_CONFIG = {"name": "Claude (Đen)", "provider": "mock", "model": "mock-black"}
@@ -26,13 +34,27 @@ RESULT_MESSAGES_VI = {
 
 
 def _new_player_stats():
-    return {"illegal_attempts": 0, "api_errors": 0, "moves": 0, "total_latency_ms": 0}
+    return {
+        "illegal_attempts": 0,
+        "api_errors": 0,
+        "moves": 0,
+        "total_latency_ms": 0,
+        "blunders": 0,
+        "mistakes": 0,
+        "best_moves": 0,
+        "accuracy": None,   # None khi chưa chấm được nước nào (thiếu engine)
+    }
 
 
 class MatchReferee:
-    def __init__(self, red_config=None, black_config=None):
+    def __init__(self, red_config=None, black_config=None, analysis_engine=AUTO_ANALYSIS_ENGINE):
         self.red_config = red_config or dict(DEFAULT_RED_CONFIG)
         self.black_config = black_config or dict(DEFAULT_BLACK_CONFIG)
+        # Engine chấm điểm dùng chung cho cả trận. Thiếu engine -> chỉ mất phần chấm điểm,
+        # trận vẫn chạy bình thường.
+        self.analysis_engine = (
+            PikafishEngine() if analysis_engine is AUTO_ANALYSIS_ENGINE else analysis_engine
+        )
         self._start_new_game(
             f"Trọng tài: Trận đấu giữa {self.red_config['name']} và "
             f"{self.black_config['name']} chính thức BẮT ĐẦU!"
@@ -57,6 +79,8 @@ class MatchReferee:
         self.last_move = None
         self.move_logs = []
         self.stats = {'w': _new_player_stats(), 'b': _new_player_stats()}
+        self.evaluations = {'w': [], 'b': []}   # MoveEvaluation theo từng bên
+        self.current_cp = 0                     # điểm thế cờ theo góc nhìn Đỏ, cho eval bar
         self.referee_log = [opening_message]
 
     def reset(self, red_config=None, black_config=None):
@@ -109,6 +133,7 @@ class MatchReferee:
             )
 
         vi_notation = self.board.to_vietnamese_notation(chosen_move)
+        fen_before = self.board.to_fen()
         success, message = self.board.push_ucci(chosen_move)
         if not success:
             # Không nên xảy ra: chosen_move đã nằm trong legal_moves
@@ -120,6 +145,10 @@ class MatchReferee:
         self.stats[side]["moves"] += 1
         self.stats[side]["total_latency_ms"] += decision.latency_ms
 
+        # Chấm điểm SAU khi đi, để engine không ảnh hưởng tới quyết định của AI
+        evaluation = score_move(self.analysis_engine, fen_before, self.board.to_fen(), chosen_move)
+        self._record_evaluation(side, evaluation)
+
         self.last_move = {
             "side": side,
             "player": self._player_name(side),
@@ -130,11 +159,21 @@ class MatchReferee:
             "referee_override": referee_override,
             "latency_ms": decision.latency_ms,
             "error": decision.error,
+            "evaluation": evaluation.to_dict() if evaluation else None,
         }
         self.move_logs.append(self.last_move)
 
         ply = len(self.move_logs)
-        self._log(f"Nước #{ply}: {self._player_name(side)} đi {vi_notation} [{chosen_move}]")
+        quality_suffix = f" — {evaluation.quality_label_vi}" if evaluation else ""
+        self._log(
+            f"Nước #{ply}: {self._player_name(side)} đi {vi_notation} "
+            f"[{chosen_move}]{quality_suffix}"
+        )
+        if evaluation and evaluation.cp_loss >= BLUNDER_COMMENT_THRESHOLD:
+            self._log(
+                f"Trọng tài: Nước đi tai hoạ! {self._player_name(side)} mất "
+                f"{evaluation.cp_loss} điểm — engine khuyên {evaluation.engine_bestmove}"
+            )
 
         if self.board.is_in_check():
             self._log(f"Trọng tài: CHIẾU TƯỚNG! {self._player_name(self.board.turn)} bị chiếu!")
@@ -186,6 +225,26 @@ class MatchReferee:
         decision.attempts = attempts
         return decision, attempts
 
+    def _record_evaluation(self, side, evaluation):
+        """Cập nhật thống kê chất lượng nước đi và điểm thế cờ cho eval bar."""
+        if evaluation is None:
+            return
+
+        self.evaluations[side].append(evaluation)
+        stats = self.stats[side]
+        if evaluation.quality == "blunder":
+            stats["blunders"] += 1
+        elif evaluation.quality == "mistake":
+            stats["mistakes"] += 1
+        elif evaluation.quality == "best":
+            stats["best_moves"] += 1
+
+        accuracy = average_accuracy(self.evaluations[side])
+        stats["accuracy"] = round(accuracy, 1) if accuracy is not None else None
+
+        # Eval bar luôn hiển thị theo góc nhìn Đỏ để người xem không bị lẫn
+        self.current_cp = evaluation.cp_after if side == 'w' else -evaluation.cp_after
+
     def _finish(self, result):
         self.game_over = True
         self.result_status = result.status
@@ -222,4 +281,8 @@ class MatchReferee:
             "material": self.board.material_summary(),
             "stats": {"red": self.stats['w'], "black": self.stats['b']},
             "referee_log": self.referee_log[-5:],
+            # Dữ liệu chấm điểm: eval bar + trạng thái engine
+            "eval_cp": self.current_cp,
+            "analysis_enabled": self.analysis_engine is not None and self.analysis_engine.is_available,
+            "analysis_note": getattr(self.analysis_engine, "unavailable_reason", None),
         }

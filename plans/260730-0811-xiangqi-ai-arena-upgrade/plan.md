@@ -1,6 +1,6 @@
 # Xiangqi AI Arena — Nâng cấp thành "cuộc chiến AI thực thụ"
 
-**Status:** Phase 1 XONG (2026-07-30) | Phase 2 chưa bắt đầu | **Created:** 2026-07-30 | **Owner:** lephudao
+**Status:** Phase 1 XONG · Phase 2 đang làm (Pikafish + chấm điểm XONG) | **Created:** 2026-07-30 | **Owner:** lephudao
 
 ## Mục tiêu
 
@@ -23,16 +23,17 @@ Biến hệ thống hiện tại (demo chạy được) thành đấu trường 
 | Phase | Nội dung | File | Ưu tiên | Est. |
 |-------|----------|------|---------|------|
 | 1 | Sửa tính đúng đắn luật cờ + an toàn vận hành | [phase-01-rules-correctness.md](phase-01-rules-correctness.md) | ✅ XONG | ~1 ngày |
-| 2 | Pikafish chấm điểm + provider layer + prompt thật | [phase-02-real-ai-battle.md](phase-02-real-ai-battle.md) | 🟠 Cốt lõi | ~2 ngày |
+| 2 | Pikafish chấm điểm + provider layer + prompt thật | [phase-02-real-ai-battle.md](phase-02-real-ai-battle.md) | 🟠 Đang làm | ~2 ngày |
 | 3 | Persist + replay + tournament + Elo + overlay OBS | [phase-03-content-production.md](phase-03-content-production.md) | 🟡 Scale content | ~2 ngày |
+| 4 | Chế độ Người vs AI | [phase-04-human-vs-ai.md](phase-04-human-vs-ai.md) | 🟡 Content mới | ~0.5 ngày |
 
-**Dependencies:** Phase 2 phụ thuộc Phase 1 (chấm điểm vô nghĩa nếu nước đi sai luật). Phase 3 phụ thuộc Phase 2 (persist cần schema eval). Trong mỗi phase các task tuần tự.
+**Dependencies:** Phase 2 phụ thuộc Phase 1 (chấm điểm vô nghĩa nếu nước đi sai luật). Phase 3 phụ thuộc Phase 2 (persist cần schema eval). Phase 4 phụ thuộc Phase 2+3. Trong mỗi phase các task tuần tự.
 
 ## Acceptance criteria toàn plan
 
 - [x] Test suite luật cờ pass: check detection, chiếu bí, hết nước, lộ mặt tướng, hòa 60 nước, lặp 3 lần
 - [x] Chạy 1 trận mock 200 nước không sinh nước sai luật, không treo, kết thúc đúng trạng thái
-- [ ] Pikafish chấm được mọi nước; UI hiện eval bar + nhãn chất lượng (Hay/Sai/Blunder)
+- [x] Pikafish chấm được mọi nước; UI hiện eval bar + nhãn chất lượng (Hay/Sai/Blunder)
 - [ ] 5+ provider hoạt động: OpenAI, Gemini, Anthropic, Grok, DeepSeek (+ Pikafish làm player boss)
 - [x] Nước sai luật của AI được **đếm và log**, không bị âm thầm thay bằng random
 - [ ] Trận lưu vào SQLite; replay lại được từ DB không gọi API
@@ -48,8 +49,15 @@ Biến hệ thống hiện tại (demo chạy được) thành đấu trường 
 4. **State theo match_id, không global singleton** — điều kiện cần cho tournament + livestream nhiều trận.
 5. **Degradation rõ ràng:** thiếu Pikafish → tắt chấm điểm nhưng trận vẫn chạy; lỗi API → log lỗi thật, không giả vờ AI đi nước random.
 
+## Quyết định đã chốt (2026-07-30)
+
+1. **Người vs AI: CÓ** → tách thành [Phase 4](phase-04-human-vs-ai.md).
+2. **TTS: giữ Web Speech vi-VN** trước; cân nhắc ElevenLabs sau khi quy trình quay video đã ổn.
+3. **Luật hoà: chấp nhận đơn giản hoá** — chiếu liên tục xử hoà, không cài luật phạt chuẩn Á Châu.
+4. **API key hiện có: Gemini + Anthropic** → hai provider này test bằng key thật; OpenAI/Grok/DeepSeek
+   viết theo cùng chuẩn OpenAI-compatible nhưng chỉ test bằng fixture, đánh dấu "chưa kiểm chứng thật".
+5. **Deploy: chạy local + quay màn hình** trước; livestream chỉ làm sau khi thêm xác thực.
+
 ## Câu hỏi chưa giải quyết
 
-1. Có muốn thêm chế độ **Người vs AI** (bạn tự đánh với AI) không? Hiện plan chỉ AI vs AI.
-2. TTS: giữ Web Speech vi-VN (free, giọng robot) hay nâng ElevenLabs (chất lượng cao, có phí)?
-3. Luật hòa: chấp nhận đơn giản hóa (bỏ luật cấm chiếu tướng liên tục / vây bắt liên tục) hay cần đúng chuẩn Á Châu đầy đủ?
+Chưa có.

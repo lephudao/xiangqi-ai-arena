@@ -2,15 +2,19 @@
 Test trọng tài & vòng đời trận đấu, bao gồm smoke test một trận đầy đủ.
 """
 
+import random
+
 from engine.ai_agent import MoveDecision
 from engine.referee import MatchReferee
 from engine.xiangqi import STATUS_DRAW, STATUS_ONGOING
 
 
 def _mock_referee():
+    """Trọng tài dùng mock AI và TẮT chấm điểm engine để test chạy nhanh."""
     return MatchReferee(
         {"name": "AI Đỏ", "provider": "mock", "model": "mock"},
         {"name": "AI Đen", "provider": "mock", "model": "mock"},
+        analysis_engine=None,
     )
 
 
@@ -19,8 +23,11 @@ def test_full_mock_match_terminates_legally():
     Smoke test: chạy trận mock tới khi kết thúc. Mọi nước phải hợp lệ và trạng thái
     kết thúc phải là một trong các kết cục đúng luật.
     """
+    # Seed cố định để test không phụ thuộc may mắn: mock đi ngẫu nhiên nên độ dài trận
+    # dao động lớn (đã quan sát 214-589 nước qua 20 trận).
+    random.seed(20260730)
     referee = _mock_referee()
-    max_plies = 600
+    max_plies = 2000
     for _ in range(max_plies):
         state = referee.step()
         if state["game_over"]:
@@ -40,8 +47,9 @@ def test_full_mock_match_terminates_legally():
 
 def test_kings_are_never_captured_in_mock_match():
     """Sau khi sửa lọc nước đi, tướng không bao giờ bị ăn (chỉ có thể bị chiếu bí)."""
+    random.seed(11)
     referee = _mock_referee()
-    for _ in range(600):
+    for _ in range(2000):
         state = referee.step()
         if state["game_over"]:
             break
@@ -125,3 +133,42 @@ def test_draw_match_has_no_winner():
     assert referee.game_over
     assert referee.result_status == STATUS_DRAW
     assert referee.winner is None
+
+
+def test_match_runs_without_analysis_engine():
+    """Thiếu engine chấm điểm: trận vẫn chạy, chỉ không có dữ liệu chất lượng nước đi."""
+    referee = _mock_referee()
+    state = referee.step()
+    assert state["analysis_enabled"] is False
+    assert state["last_move"]["evaluation"] is None
+    assert state["stats"]["red"]["accuracy"] is None
+    assert state["eval_cp"] == 0
+
+
+def test_evaluation_updates_stats_and_eval_bar():
+    """Điểm chấm phải cộng vào thống kê và eval bar (eval bar luôn theo góc nhìn Đỏ)."""
+    from engine.analysis import MoveEvaluation
+
+    referee = _mock_referee()
+    blunder = MoveEvaluation(cp_before=100, cp_after=-450, cp_loss=550, quality="blunder",
+                             accuracy=5.0, engine_bestmove="h2e2")
+    referee._record_evaluation('w', blunder)
+
+    assert referee.stats['w']["blunders"] == 1
+    assert referee.stats['w']["accuracy"] == 5.0
+    assert referee.current_cp == -450, "Đỏ vừa đi nên cp_after đã theo góc nhìn Đỏ"
+
+    # Cùng điểm đó nhưng do Đen đi -> eval bar phải đảo dấu về góc nhìn Đỏ
+    referee.current_cp = 0
+    referee._record_evaluation('b', blunder)
+    assert referee.current_cp == 450
+    assert referee.stats['b']["blunders"] == 1
+
+
+def test_accuracy_is_average_over_scored_moves():
+    from engine.analysis import MoveEvaluation
+
+    referee = _mock_referee()
+    for accuracy in (100.0, 50.0):
+        referee._record_evaluation('w', MoveEvaluation(accuracy=accuracy, quality="good"))
+    assert referee.stats['w']["accuracy"] == 75.0

@@ -243,6 +243,9 @@ function updateUI(state) {
 
     updatePlayerStats('red', state.stats.red);
     updatePlayerStats('black', state.stats.black);
+    updateEvalBar(state.eval_cp);
+    updateQualityBadge(state.last_move);
+    updateAnalysisWarning(state);
 
     // Referee text
     if (state.referee_log && state.referee_log.length > 0) {
@@ -269,6 +272,57 @@ function updatePlayerStats(sideKey, stats) {
 
     const avgSeconds = stats.moves > 0 ? (stats.total_latency_ms / stats.moves / 1000) : 0;
     document.getElementById(`latency-${sideKey}`).textContent = `Nghĩ: ${avgSeconds.toFixed(1)}s`;
+
+    const accuracyEl = document.getElementById(`accuracy-${sideKey}`);
+    if (stats.accuracy === null) {
+        accuracyEl.textContent = 'Độ chính xác: —';
+    } else {
+        accuracyEl.textContent = `Độ chính xác: ${stats.accuracy}% · Blunder: ${stats.blunders}`;
+    }
+}
+
+// Eval bar: cp dương = Đỏ ưu thế. Nén bằng hàm phi tuyến để lợi thế nhỏ vẫn thấy được
+// và lợi thế lớn không làm cột chạm đáy ngay.
+function updateEvalBar(evalCp) {
+    const cp = evalCp || 0;
+    const clamped = Math.max(-1000, Math.min(1000, cp));
+    const redShare = 50 + 50 * (2 / (1 + Math.exp(-0.004 * clamped)) - 1);
+    document.getElementById('eval-bar-fill').style.height = `${redShare.toFixed(1)}%`;
+
+    const pawnUnits = (cp / 100).toFixed(1);
+    document.getElementById('eval-value-red').textContent = cp >= 0 ? `+${pawnUnits}` : pawnUnits;
+    document.getElementById('eval-value-black').textContent = cp <= 0 ? `+${(-cp / 100).toFixed(1)}` : `${(-cp / 100).toFixed(1)}`;
+}
+
+// Badge chất lượng hiện trên thẻ của người vừa đi; xoá badge của bên còn lại
+function updateQualityBadge(lastMove) {
+    const badges = { red: document.getElementById('quality-red'), black: document.getElementById('quality-black') };
+    if (!lastMove || !lastMove.evaluation) {
+        Object.values(badges).forEach(el => el.classList.remove('visible'));
+        return;
+    }
+
+    const moverKey = lastMove.side === 'w' ? 'red' : 'black';
+    const otherKey = moverKey === 'red' ? 'black' : 'red';
+    const evaluation = lastMove.evaluation;
+
+    const badge = badges[moverKey];
+    badge.className = `quality-badge visible q-${evaluation.quality}`;
+    badge.textContent = evaluation.cp_loss > 0
+        ? `${evaluation.quality_label} (−${evaluation.cp_loss})`
+        : evaluation.quality_label;
+
+    badges[otherKey].classList.remove('visible');
+}
+
+function updateAnalysisWarning(state) {
+    const warningEl = document.getElementById('analysis-warning');
+    if (state.analysis_enabled) {
+        warningEl.hidden = true;
+        return;
+    }
+    warningEl.hidden = false;
+    warningEl.textContent = `⚠️ Chưa chấm điểm nước đi: ${state.analysis_note || 'chạy ./scripts/install-pikafish.sh để bật'}`;
 }
 
 function renderPiecesFromFEN(fen, lastMove) {
