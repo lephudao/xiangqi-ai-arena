@@ -41,6 +41,7 @@ engine/
   referee.py              Trọng tài: phân lượt, xác thực nước đi, đếm vi phạm, kết luận trận
   model_registry.py       Danh mục model + bảng giá token (một chỗ duy nhất để cập nhật)
   prompt_builder.py       Dựng prompt: bàn cờ ASCII, lịch sử, kiểm kê quân, cảnh báo chiếu
+  match_manager.py        Nhiều trận song song, dùng chung một tiến trình engine
   providers/              Kỳ thủ: Claude (SDK), Gemini (SDK), OpenAI-compatible, Mock, Pikafish
   analysis/               Pikafish chấm điểm: centipawn loss, nhãn chất lượng, accuracy %
   xiangqi/
@@ -50,7 +51,8 @@ engine/
     game_rules.py         Chiếu bí / hết nước / mất tướng / các luật hoà
     notation.py           UCCI ↔ toạ độ, ký hiệu cờ tướng tiếng Việt
 web/                      Giao diện studio (vanilla JS + SVG bàn cờ + TTS)
-tests/                    pytest — luật cờ và vòng đời trận đấu
+scripts/                  install-pikafish.sh, run_matches.py (chạy trận không cần giao diện)
+tests/                    pytest — luật cờ, vòng đời trận, provider, quản lý trận
 plans/                    Kế hoạch nâng cấp theo phase
 ```
 
@@ -90,5 +92,5 @@ Mốc kiểm chứng chính: thế khai cuộc có đúng **44 nước đi hợp
 Xem [plans/260730-0811-xiangqi-ai-arena-upgrade/plan.md](plans/260730-0811-xiangqi-ai-arena-upgrade/plan.md):
 
 - **Phase 1** (xong) — sửa tính đúng đắn luật cờ + an toàn vận hành
-- **Phase 2** (gần xong) — Pikafish chấm điểm ✅, provider layer ✅, prompt nghiêm túc ✅; còn match_manager
+- **Phase 2** (xong) — Pikafish chấm điểm, tầng provider dùng SDK, prompt đầy đủ ngữ cảnh, nhiều trận song song
 - **Phase 3** — lưu trận vào SQLite, replay không tốn API, giải đấu headless, Elo, overlay OBS

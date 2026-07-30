@@ -17,14 +17,16 @@ from flask_cors import CORS
 load_dotenv(".env")
 load_dotenv(".env.local", override=True)
 
-from engine.referee import MatchReferee  # noqa: E402 — phải import sau load_dotenv
+from engine.match_manager import MatchManager  # noqa: E402 — phải import sau load_dotenv
 
 app = Flask(__name__, static_folder="web")
 
 ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "http://localhost:5000,http://127.0.0.1:5000")
 CORS(app, origins=[origin.strip() for origin in ALLOWED_ORIGINS.split(",") if origin.strip()])
 
-match = MatchReferee()
+# Nhiều trận cùng lúc, dùng chung một tiến trình engine chấm điểm.
+# Các route không có match_id sẽ tác động lên "trận đang xem".
+manager = MatchManager()
 
 
 @app.route("/")
@@ -37,21 +39,70 @@ def static_files(path):
     return send_from_directory("web", path)
 
 
+def _resolve_match(match_id=None):
+    """
+    Lấy trận theo id, hoặc trận đang xem nếu không truyền id.
+    Trả (referee, phản hồi lỗi) — referee là None khi id không tồn tại.
+    """
+    if match_id is None:
+        return manager.get_current(), None
+    referee = manager.get(match_id)
+    if referee is None:
+        return None, (jsonify({"error": f"Không có trận '{match_id}'"}), 404)
+    return referee, None
+
+
 @app.route("/api/state", methods=["GET"])
-def get_state():
-    return jsonify(match.get_state())
+@app.route("/api/matches/<match_id>/state", methods=["GET"])
+def get_state(match_id=None):
+    referee, error = _resolve_match(match_id)
+    return error or jsonify(referee.get_state())
 
 
 @app.route("/api/step", methods=["POST"])
-def step_match():
-    return jsonify(match.step())
+@app.route("/api/matches/<match_id>/step", methods=["POST"])
+def step_match(match_id=None):
+    referee, error = _resolve_match(match_id)
+    return error or jsonify(referee.step())
 
 
 @app.route("/api/reset", methods=["POST"])
 def reset_match():
+    """Lập lại trận đang xem, giữ nguyên id trận."""
     data = request.get_json(silent=True) or {}
-    match.reset(data.get("red_config"), data.get("black_config"))
-    return jsonify(match.get_state())
+    referee = manager.get_current()
+    referee.reset(data.get("red_config"), data.get("black_config"))
+    return jsonify(referee.get_state())
+
+
+@app.route("/api/matches", methods=["GET"])
+def list_matches():
+    return jsonify({"matches": manager.list_matches(), "current": manager.current_match_id})
+
+
+@app.route("/api/matches", methods=["POST"])
+def create_match():
+    """Mở một trận MỚI song song, không ảnh hưởng trận đang chạy."""
+    data = request.get_json(silent=True) or {}
+    match_id, referee = manager.create(data.get("red_config"), data.get("black_config"))
+    state = referee.get_state()
+    state["match_id"] = match_id
+    return jsonify(state), 201
+
+
+@app.route("/api/matches/<match_id>/select", methods=["POST"])
+def select_match(match_id):
+    """Chuyển trận đang xem — dùng khi quay nhiều trận trong một buổi."""
+    if not manager.set_current(match_id):
+        return jsonify({"error": f"Không có trận '{match_id}'"}), 404
+    return jsonify(manager.get(match_id).get_state())
+
+
+@app.route("/api/matches/<match_id>", methods=["DELETE"])
+def delete_match(match_id):
+    if not manager.delete(match_id):
+        return jsonify({"error": f"Không có trận '{match_id}'"}), 404
+    return "", 204
 
 
 @app.route("/api/models", methods=["GET"])
@@ -66,9 +117,13 @@ def get_models():
 
 
 @app.route("/api/history", methods=["GET"])
-def get_history():
-    """Toàn bộ nước đi + nhật ký trọng tài của trận hiện tại (dùng để dựng video)."""
-    return jsonify({"moves": match.move_logs, "referee_log": match.referee_log})
+@app.route("/api/matches/<match_id>/history", methods=["GET"])
+def get_history(match_id=None):
+    """Toàn bộ nước đi + nhật ký trọng tài (dùng để dựng video)."""
+    referee, error = _resolve_match(match_id)
+    if error:
+        return error
+    return jsonify({"moves": referee.move_logs, "referee_log": referee.referee_log})
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # Xiangqi AI Arena — Nâng cấp thành "cuộc chiến AI thực thụ"
 
-**Status:** Phase 1 XONG · Phase 2 gần xong (Pikafish + provider layer + prompt XONG; còn match_manager) | **Created:** 2026-07-30 | **Owner:** lephudao
+**Status:** Phase 1 XONG · Phase 2 XONG · Phase 3 chưa bắt đầu | **Created:** 2026-07-30 | **Owner:** lephudao
 
 ## Mục tiêu
 
@@ -23,7 +23,7 @@ Biến hệ thống hiện tại (demo chạy được) thành đấu trường 
 | Phase | Nội dung | File | Ưu tiên | Est. |
 |-------|----------|------|---------|------|
 | 1 | Sửa tính đúng đắn luật cờ + an toàn vận hành | [phase-01-rules-correctness.md](phase-01-rules-correctness.md) | ✅ XONG | ~1 ngày |
-| 2 | Pikafish chấm điểm + provider layer + prompt thật | [phase-02-real-ai-battle.md](phase-02-real-ai-battle.md) | 🟠 Đang làm | ~2 ngày |
+| 2 | Pikafish chấm điểm + provider layer + prompt thật | [phase-02-real-ai-battle.md](phase-02-real-ai-battle.md) | ✅ XONG | ~2 ngày |
 | 3 | Persist + replay + tournament + Elo + overlay OBS | [phase-03-content-production.md](phase-03-content-production.md) | 🟡 Scale content | ~2 ngày |
 | 4 | Chế độ Người vs AI | [phase-04-human-vs-ai.md](phase-04-human-vs-ai.md) | 🟡 Content mới | ~0.5 ngày |
 

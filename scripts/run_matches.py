@@ -54,6 +54,10 @@ def run_match(red_key, black_key, max_moves, cost_budget_left, analysis_engine):
         quality = evaluation.get("quality_label", "—")
         cp_loss = evaluation.get("cp_loss")
         flags = []
+        # Số lần thử > 1 nghĩa là AI đã đi sai luật và phải chọn lại — thước đo sức mạnh
+        attempts = len(move.get("attempts") or [])
+        if attempts > 1:
+            flags.append(f"SAI LUẬT {attempts - 1} lần")
         if move.get("referee_override"):
             flags.append("TRỌNG TÀI CHỌN THAY")
         if move.get("error"):
@@ -61,7 +65,7 @@ def run_match(red_key, black_key, max_moves, cost_budget_left, analysis_engine):
         print(
             f"{ply:3d}. {move['player'][:18]:18s} {move['vi_text']:22s} "
             f"{quality:22s} cp_loss={cp_loss if cp_loss is not None else '—':>6} "
-            f"{' '.join(flags)}",
+            f"{move['latency_ms'] / 1000:5.1f}s {' '.join(flags)}",
             flush=True,
         )
 

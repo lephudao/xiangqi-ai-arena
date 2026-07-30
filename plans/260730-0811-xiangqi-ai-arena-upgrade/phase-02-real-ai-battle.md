@@ -1,6 +1,6 @@
 # Phase 2 — Đấu trí thật: Pikafish chấm điểm + provider layer + prompt nghiêm túc
 
-**Status:** pending | **Est:** ~2 ngày | **Depends:** Phase 1 | **Blocks:** Phase 3
+**Status:** ✅ XONG (2026-07-30) | **Est:** ~2 ngày | **Depends:** Phase 1 | **Blocks:** Phase 3
 
 ## Vấn đề đang giải
 
@@ -203,12 +203,12 @@ Tests provider dùng fixture, không tốn tiền API. Smoke test có API thật
 
 ## Acceptance criteria
 
-- [ ] `scripts/install-pikafish.sh` chạy xong → `uciok`; thiếu binary vẫn chạy được trận (degradation)
-- [ ] Mọi nước có `cp_loss` + nhãn chất lượng; test đảo dấu pass
-- [ ] Accuracy % mỗi player hiện trên UI, khớp công thức
-- [ ] 6 loại player hoạt động: OpenAI, Gemini, Anthropic, Grok, DeepSeek, Pikafish(+mock)
-- [ ] Prompt giống nhau cho mọi provider (fairness), có ASCII board + history + cảnh báo chiếu
-- [ ] Nước sai luật được đếm hiển thị, có retry-with-feedback 2 lần
-- [ ] `thinking` và `taunt` tách biệt; TTS chỉ đọc `taunt`
-- [ ] Chạy song song 2 trận qua `/api/matches` không lẫn state
-- [ ] Cost tracker hiện chi phí trận realtime
+- [x] `scripts/install-pikafish.sh` chạy xong → `uciok`; thiếu binary vẫn chạy được trận (degradation)
+- [x] Mọi nước có `cp_loss` + nhãn chất lượng; test đảo dấu pass
+- [x] Accuracy % mỗi player hiện trên UI, khớp công thức
+- [x] 6 loại player hoạt động: OpenAI, Gemini, Anthropic, Grok, DeepSeek, Pikafish(+mock)
+- [x] Prompt giống nhau cho mọi provider (fairness), có ASCII board + history + cảnh báo chiếu
+- [x] Nước sai luật được đếm hiển thị, có retry-with-feedback 2 lần
+- [x] `thinking` và `taunt` tách biệt; TTS chỉ đọc `taunt`
+- [x] Chạy song song 2 trận qua `/api/matches` không lẫn state
+- [x] Cost tracker hiện chi phí trận realtime
