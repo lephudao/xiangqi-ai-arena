@@ -38,10 +38,33 @@ def test_cost_estimate_uses_price_table():
 
 
 def test_cost_is_none_when_price_unknown():
-    """Model chưa có bảng giá phải trả None, không được bịa số."""
-    assert get_model("gemini-3.1-pro").input_price is None
-    assert estimate_cost_usd("gemini-3.1-pro", 1000, 1000) is None
+    """Model chưa niêm yết giá phải trả None, không được bịa số."""
+    # Trang giá của Google không có Gemini 3 Pro
+    assert get_model("gemini-3-pro").input_price is None
+    assert estimate_cost_usd("gemini-3-pro", 1000, 1000) is None
     assert estimate_cost_usd("khong-ton-tai", 1000, 1000) is None
+
+
+def test_gemini_pricing_matches_official_table():
+    """Giá lấy từ ai.google.dev/gemini-api/docs/pricing (bậc prompt <= 200k token)."""
+    assert estimate_cost_usd("gemini-3.1-pro", 1_000_000, 0) == pytest.approx(2.00)
+    assert estimate_cost_usd("gemini-3.1-pro", 0, 1_000_000) == pytest.approx(12.00)
+    assert estimate_cost_usd("gemini-3.6-flash", 1_000_000, 0) == pytest.approx(1.50)
+    assert estimate_cost_usd("gemini-2.5-pro", 0, 1_000_000) == pytest.approx(10.00)
+
+
+def test_haiku_request_omits_unsupported_params():
+    """Haiku 4.5 không có adaptive thinking và không nhận `effort` — gửi sẽ bị lỗi 400."""
+    from engine.providers.anthropic_provider import AnthropicProvider
+
+    haiku_request = AnthropicProvider(get_model("claude-haiku-4-5"))._build_request("p")
+    assert "thinking" not in haiku_request
+    assert "effort" not in haiku_request["output_config"]
+
+    # Opus 5 thì ngược lại: bắt buộc adaptive, có effort
+    opus_request = AnthropicProvider(get_model("claude-opus-5"))._build_request("p")
+    assert opus_request["thinking"] == {"type": "adaptive"}
+    assert opus_request["output_config"]["effort"] == "low"
 
 
 # --- Prompt builder ---

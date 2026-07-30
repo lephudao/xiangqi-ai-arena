@@ -23,6 +23,11 @@ class ModelInfo:
     api_key_env: str = None
     verified: bool = False      # đã gọi thử bằng key thật chưa
     note: str = ""
+    # Năng lực API khác nhau theo đời model: Haiku 4.5 không nhận `effort` và không có
+    # adaptive thinking (gửi sẽ bị từ chối 400), trong khi Opus 5 / Sonnet 5 thì bắt buộc
+    # dùng adaptive và đã bỏ budget_tokens.
+    supports_effort: bool = True
+    supports_adaptive_thinking: bool = True
 
 
 # Giá Anthropic theo bảng giá chính thức. Sonnet 5 đang có giá giới thiệu
@@ -36,25 +41,28 @@ _ANTHROPIC = [
               note="Cân bằng tốc độ/chi phí; đang có giá giới thiệu $2/$10"),
     ModelInfo("claude-haiku-4-5", "Claude Haiku 4.5", "anthropic", "claude-haiku-4-5",
               1.00, 5.00, api_key_env="ANTHROPIC_API_KEY",
-              note="Rẻ và nhanh nhất; dùng cho trận dài nhiều nước"),
+              note="Rẻ và nhanh nhất; dùng cho trận dài nhiều nước",
+              supports_effort=False, supports_adaptive_thinking=False),
     ModelInfo("claude-opus-4-8", "Claude Opus 4.8", "anthropic", "claude-opus-4-8",
               5.00, 25.00, api_key_env="ANTHROPIC_API_KEY",
               note="Thế hệ Opus trước, để so sánh tiến bộ giữa các đời model"),
 ]
 
 # Model ID lấy trực tiếp từ API Gemini (models.list) ngày 2026-07-30.
-# Giá chưa có số liệu xác thực -> để None, KHÔNG đoán.
+# Giá lấy từ ai.google.dev/gemini-api/docs/pricing, bậc "prompt <= 200k token" — prompt của
+# hệ thống chỉ khoảng 1-2k token nên luôn nằm ở bậc này. Giá output đã bao gồm thinking token.
 _GEMINI = [
     ModelInfo("gemini-3.1-pro", "Gemini 3.1 Pro", "gemini", "gemini-3.1-pro-preview",
-              api_key_env="GEMINI_API_KEY", verified=True,
+              2.00, 12.00, api_key_env="GEMINI_API_KEY", verified=True,
               note="Bản Pro mới nhất; đã gọi thử thành công"),
     ModelInfo("gemini-3.6-flash", "Gemini 3.6 Flash", "gemini", "gemini-3.6-flash",
-              api_key_env="GEMINI_API_KEY",
+              1.50, 7.50, api_key_env="GEMINI_API_KEY",
               note="Flash mới nhất, nhanh và rẻ hơn Pro"),
+    # Trang giá của Google không niêm yết Gemini 3 Pro -> để None thay vì đoán
     ModelInfo("gemini-3-pro", "Gemini 3 Pro", "gemini", "gemini-3-pro-preview",
-              api_key_env="GEMINI_API_KEY"),
+              api_key_env="GEMINI_API_KEY", note="Trang giá Google chưa niêm yết model này"),
     ModelInfo("gemini-2.5-pro", "Gemini 2.5 Pro", "gemini", "gemini-2.5-pro",
-              api_key_env="GEMINI_API_KEY",
+              1.25, 10.00, api_key_env="GEMINI_API_KEY",
               note="Thế hệ trước, để so sánh tiến bộ giữa các đời model"),
 ]
 
@@ -83,7 +91,7 @@ _BASELINES = [
 ALL_MODELS = _ANTHROPIC + _GEMINI + _OPENAI_COMPATIBLE + _BASELINES
 _BY_KEY = {model.key: model for model in ALL_MODELS}
 
-DEFAULT_RED_MODEL = "claude-opus-5"
+DEFAULT_RED_MODEL = "claude-haiku-4-5"
 DEFAULT_BLACK_MODEL = "gemini-3.1-pro"
 
 

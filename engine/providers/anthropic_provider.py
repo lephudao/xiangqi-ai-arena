@@ -39,18 +39,7 @@ class AnthropicProvider(MoveProvider):
         started = time.monotonic()
         try:
             response = self._get_client().messages.create(
-                model=self.model_info.model_id,
-                max_tokens=MAX_TOKENS,
-                # Adaptive thinking: model tự quyết nghĩ sâu bao nhiêu. Đo thực tế cho thấy
-                # ở task này model thường không nghĩ (chỉ ~60 output token), nên phần phân
-                # tích hiển thị cho video lấy từ trường "analysis" trong JSON, không lấy từ
-                # thinking block của API.
-                thinking={"type": "adaptive"},
-                output_config={
-                    "effort": self.effort,
-                    "format": {"type": "json_schema", "schema": MOVE_SCHEMA},
-                },
-                messages=[{"role": "user", "content": prompt}],
+                **self._build_request(prompt)
             )
         except Exception as exc:
             return self._failure(exc, started)
@@ -85,6 +74,28 @@ class AnthropicProvider(MoveProvider):
             taunt=data.get("taunt", ""),
             thinking=data.get("analysis", ""),
         )
+
+    def _build_request(self, prompt):
+        """
+        Ghép tham số theo đúng năng lực của từng đời model.
+
+        Adaptive thinking và `effort` chỉ có ở các model 4.6 trở lên; gửi cho Haiku 4.5
+        sẽ bị API từ chối với lỗi 400. Phần phân tích cho video lấy từ trường "analysis"
+        trong JSON nên không phụ thuộc thinking block của API.
+        """
+        output_config = {"format": {"type": "json_schema", "schema": MOVE_SCHEMA}}
+        if self.model_info.supports_effort:
+            output_config["effort"] = self.effort
+
+        request = {
+            "model": self.model_info.model_id,
+            "max_tokens": MAX_TOKENS,
+            "output_config": output_config,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        if self.model_info.supports_adaptive_thinking:
+            request["thinking"] = {"type": "adaptive"}
+        return request
 
     def _decision(self, latency_ms, tokens_in, tokens_out, **kwargs):
         return MoveDecision(
