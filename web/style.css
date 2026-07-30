@@ -18,6 +18,13 @@
     padding: 0;
 }
 
+/* Thuộc tính hidden của HTML phải luôn thắng.
+   Quy tắc lớp như `.replay-bar { display: flex }` có độ ưu tiên cao hơn quy tắc mặc định
+   của trình duyệt cho [hidden], nên nếu không có dòng này thì phần tử đặt hidden vẫn hiện. */
+[hidden] {
+    display: none !important;
+}
+
 body {
     font-family: 'Inter', sans-serif;
     background-color: var(--bg-dark);
@@ -956,4 +963,29 @@ body.overlay-transparent .studio-header {
 
 body.overlay-transparent .player-card {
     background: rgba(15, 23, 42, 0.72);
+}
+
+/* ===== Chế độ Người vs AI ===== */
+
+/* Đổi con trỏ để thấy rõ đang tới lượt mình */
+body.human-turn .xiangqi-board { cursor: pointer; }
+
+/* Quân đang chọn */
+.piece.selected {
+    box-shadow: 0 0 0 3px var(--primary-gold), 0 4px 10px rgba(0, 0, 0, 0.5);
+    transform: translate(-50%, -50%) scale(1.08);
+    z-index: 25;
+}
+
+/* Chấm gợi ý ở các ô đi được */
+.move-hint {
+    position: absolute;
+    width: 4.5%;
+    aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+    background: rgba(245, 158, 11, 0.75);
+    border-radius: 50%;
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.6);
+    z-index: 6;
+    pointer-events: none;
 }

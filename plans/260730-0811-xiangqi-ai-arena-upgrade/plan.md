@@ -1,6 +1,6 @@
 # Xiangqi AI Arena — Nâng cấp thành "cuộc chiến AI thực thụ"
 
-**Status:** Phase 1 XONG · Phase 2 XONG · Phase 3 XONG · Phase 4 (Người vs AI) chưa bắt đầu | **Created:** 2026-07-30 | **Owner:** lephudao
+**Status:** Phase 1-4 XONG (2026-07-30) | **Created:** 2026-07-30 | **Owner:** lephudao
 
 ## Mục tiêu
 
@@ -25,7 +25,7 @@ Biến hệ thống hiện tại (demo chạy được) thành đấu trường 
 | 1 | Sửa tính đúng đắn luật cờ + an toàn vận hành | [phase-01-rules-correctness.md](phase-01-rules-correctness.md) | ✅ XONG | ~1 ngày |
 | 2 | Pikafish chấm điểm + provider layer + prompt thật | [phase-02-real-ai-battle.md](phase-02-real-ai-battle.md) | ✅ XONG | ~2 ngày |
 | 3 | Persist + replay + tournament + Elo + overlay OBS | [phase-03-content-production.md](phase-03-content-production.md) | ✅ XONG | ~2 ngày |
-| 4 | Chế độ Người vs AI | [phase-04-human-vs-ai.md](phase-04-human-vs-ai.md) | 🟡 Content mới | ~0.5 ngày |
+| 4 | Chế độ Người vs AI | [phase-04-human-vs-ai.md](phase-04-human-vs-ai.md) | ✅ XONG | ~0.5 ngày |
 
 **Dependencies:** Phase 2 phụ thuộc Phase 1 (chấm điểm vô nghĩa nếu nước đi sai luật). Phase 3 phụ thuộc Phase 2 (persist cần schema eval). Phase 4 phụ thuộc Phase 2+3. Trong mỗi phase các task tuần tự.
 

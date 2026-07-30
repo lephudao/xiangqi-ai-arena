@@ -5,6 +5,7 @@
 
 import { renderBoardGrid, renderPieces } from './js/board-renderer.js';
 import { ReplayController } from './js/replay-controller.js';
+import { HumanInput } from './js/human-input.js';
 
 let currentState = null;
 let isAutoPlaying = false;
@@ -12,6 +13,7 @@ let autoPlayTimer = null;
 let synth = window.speechSynthesis;
 let availableModels = [];
 let replay = null;
+let humanInput = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
     applyOverlayMode();
@@ -29,7 +31,56 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-close-result').addEventListener('click', hideResultBanner);
 
     setupReplay();
+    setupHumanPlay();
 });
+
+// ===== Chế độ Người vs AI =====
+
+function setupHumanPlay() {
+    humanInput = new HumanInput(document.getElementById('board'), submitHumanMove);
+    document.getElementById('btn-hint').addEventListener('click', requestHint);
+}
+
+async function submitHumanMove(ucci) {
+    try {
+        const response = await fetch('/api/human-move', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ucci }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            // Nước sai luật: hiện đúng lý do trọng tài đưa ra, không im lặng bỏ qua
+            document.getElementById('referee-text').textContent = `Nước không hợp lệ: ${data.error}`;
+            updateUI(data.state);
+            return;
+        }
+        playPieceSound();
+        updateUI(data);
+        if (document.getElementById('chk-tts').checked && data.last_move) speakMove(data.last_move);
+        if (data.game_over) return showResultBanner(data);
+
+        // Đi xong thì để AI đáp lại ngay, người chơi không phải bấm thêm nút
+        if (!data.is_human_turn) await handleStep();
+    } catch (e) {
+        document.getElementById('referee-text').textContent = `Lỗi gửi nước đi: ${e.message}`;
+    }
+}
+
+async function requestHint() {
+    try {
+        const response = await fetch('/api/hint', { method: 'POST' });
+        const data = await response.json();
+        if (!response.ok) {
+            document.getElementById('referee-text').textContent = data.error;
+            return;
+        }
+        document.getElementById('referee-text').textContent =
+            `Engine gợi ý: ${data.vi_text} [${data.ucci}] — nước này sẽ bị đánh dấu là có dùng gợi ý`;
+    } catch (e) {
+        document.getElementById('referee-text').textContent = `Không lấy được gợi ý: ${e.message}`;
+    }
+}
 
 /**
  * Chế độ overlay cho OBS: ?overlay=1
@@ -297,6 +348,11 @@ async function fetchState() {
 
 async function handleStep() {
     if (replay && replay.isActive) return;   // đang xem lại thì không gọi API
+    if (currentState && currentState.is_human_turn) {
+        document.getElementById('referee-text').textContent =
+            'Tới lượt bạn — bấm vào quân cờ để đi.';
+        return;
+    }
     // Tên bên sắp đi, lấy TRƯỚC khi gọi API để lớp phủ nói đúng ai đang nghĩ
     const thinkingPlayer = currentState
         ? (currentState.turn === 'w' ? currentState.red_config.name : currentState.black_config.name)
@@ -316,6 +372,11 @@ async function handleStep() {
         if (data.game_over) {
             stopAutoPlay();
             showResultBanner(data);
+        } else if (isAutoPlaying && data.is_human_turn) {
+            // Không được tự đi thay người chơi
+            stopAutoPlay();
+            document.getElementById('referee-text').textContent =
+                'Đã dừng tự động: tới lượt bạn đi.';
         } else if (isAutoPlaying && exceedsBudget(data)) {
             stopAutoPlay();
             document.getElementById('referee-text').textContent =
@@ -464,6 +525,16 @@ function updateUI(state) {
     }
 
     renderPieces(document.getElementById('board'), state.fen, state.last_move);
+
+    // Bật thao tác chuột và nút gợi ý đúng lượt người chơi
+    const humanTurn = !!state.is_human_turn && !state.game_over;
+    if (humanInput) humanInput.setState(humanTurn, state.legal_moves);
+    document.body.classList.toggle('human-turn', humanTurn);
+    document.getElementById('btn-hint').hidden = !humanTurn;
+    if (humanTurn) {
+        document.getElementById('referee-text').textContent =
+            'Tới lượt bạn — bấm vào quân cờ để xem các nước đi được.';
+    }
 }
 
 // Dòng phụ dưới tên kỳ thủ: nêu nhà cung cấp và ID model chính xác, không lặp lại tên

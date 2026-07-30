@@ -80,8 +80,10 @@ _OPENAI_COMPATIBLE = [
               note="Chưa kiểm chứng: cần DEEPSEEK_API_KEY"),
 ]
 
-# Đối thủ không phải LLM: mốc sàn (đi ngẫu nhiên) và mốc trần (engine cờ tướng)
+# Đối thủ không phải LLM: người thật, mốc sàn (đi ngẫu nhiên) và mốc trần (engine cờ tướng)
 _BASELINES = [
+    ModelInfo("human", "Người chơi (bạn)", "human", "human", 0.0, 0.0, verified=True,
+              note="Bạn tự đánh; nước đi được chấm điểm y như AI"),
     ModelInfo("mock", "Mock (đi ngẫu nhiên)", "mock", "mock-v1", 0.0, 0.0, verified=True,
               note="Mốc sàn: chọn ngẫu nhiên trong các nước hợp lệ"),
     ModelInfo("pikafish", "Pikafish (engine)", "pikafish", "pikafish", 0.0, 0.0, verified=True,

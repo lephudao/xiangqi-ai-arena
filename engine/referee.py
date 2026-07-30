@@ -8,7 +8,7 @@ hoàn toàn không đưa được nước hợp lệ.
 
 from engine.analysis import PikafishEngine, average_accuracy, score_move
 from engine.prompt_builder import build_move_prompt
-from engine.providers import create_provider
+from engine.providers import MoveDecision, create_provider
 from engine.xiangqi import STATUS_DRAW, STATUS_ONGOING, XiangqiBoard
 
 MAX_MOVE_ATTEMPTS = 3
@@ -136,6 +136,7 @@ class MatchReferee:
         self.current_cp = 0                     # điểm thế cờ theo góc nhìn Đỏ, cho eval bar
         self.recorder = None                    # kho lưu trữ, gắn qua attach_recorder()
         self.record_id = None
+        self.hint_used_this_turn = False         # ghi lại để không thổi phồng độ chính xác
         self.referee_log = [opening_message] + self._pending_notes
 
     def reset(self, red_config=None, black_config=None):
@@ -178,6 +179,12 @@ class MatchReferee:
             return self.get_state()
 
         side = self.board.turn
+
+        # Kỳ thủ người: dừng lại chờ thao tác chuột, KHÔNG tự đi thay.
+        # Đây là lý do tự động đấu phải tạm dừng ở lượt người.
+        if self._is_human_turn(side):
+            return self.get_state()
+
         legal_moves = self.board.generate_legal_moves(side)
         decision, attempts = self._request_legal_move(side, legal_moves)
 
@@ -193,6 +200,65 @@ class MatchReferee:
                 f"Trọng tài chọn thay: {chosen_move}"
             )
 
+        return self._apply_move(side, chosen_move, decision, attempts, referee_override)
+
+    def _is_human_turn(self, side=None):
+        side = side or self.board.turn
+        return getattr(self._agent(side), "is_human", False)
+
+    def submit_human_move(self, ucci):
+        """
+        Nhận nước đi của người chơi. Trả (thành công, thông báo).
+
+        Xác thực bằng ĐÚNG bộ luật dùng cho AI — người chơi không được ưu ái hơn, và lý do
+        từ chối cũng bằng tiếng Việt như khi AI đi sai.
+        """
+        if self.game_over:
+            return False, "Trận đã kết thúc"
+
+        side = self.board.turn
+        if not self._is_human_turn(side):
+            return False, f"Chưa tới lượt bạn — đang là lượt của {self._player_name(side)}"
+
+        if ucci not in self.board.generate_legal_moves(side):
+            return False, self.board.explain_illegal_move(ucci)
+
+        decision = MoveDecision(
+            move_ucci=ucci,
+            taunt="",
+            thinking="",
+            latency_ms=0,
+            cost_usd=0.0,
+            provider="human",
+            model_key=self.red_config.get("model_key") if side == 'w'
+            else self.black_config.get("model_key"),
+        )
+        used_hint = self.hint_used_this_turn
+        self.hint_used_this_turn = False
+        self._apply_move(side, ucci, decision, attempts=[ucci], referee_override=None,
+                         used_hint=used_hint)
+        return True, self.board.move_history[-1]["vi_notation"]
+
+    def request_hint(self):
+        """
+        Gợi ý nước đi từ engine cho người chơi.
+
+        Đánh dấu lượt này có dùng gợi ý: nếu không ghi lại thì độ chính xác của người sẽ
+        bị thổi phồng và không còn so sánh được với AI.
+        """
+        if self.analysis_engine is None or not self.analysis_engine.is_available:
+            return None, "Chưa cài engine nên không có gợi ý"
+        result = self.analysis_engine.analyse(self.board.to_fen())
+        if result is None or not result.bestmove:
+            return None, "Engine không đưa được gợi ý cho thế cờ này"
+
+        self.hint_used_this_turn = True
+        return result.bestmove, self.board.to_vietnamese_notation(result.bestmove)
+
+    def _apply_move(self, side, chosen_move, decision, attempts, referee_override,
+                    used_hint=False):
+        """Thực hiện nước đi, chấm điểm, ghi nhật ký và lưu trữ. Dùng chung cho AI và người."""
+        legal_moves = self.board.generate_legal_moves(side)
         vi_notation = self.board.to_vietnamese_notation(chosen_move)
         fen_before = self.board.to_fen()
         success, message = self.board.push_ucci(chosen_move)
@@ -224,6 +290,7 @@ class MatchReferee:
             "referee_override": referee_override,
             "latency_ms": decision.latency_ms,
             "error": decision.error,
+            "used_hint": used_hint,
             "evaluation": evaluation.to_dict() if evaluation else None,
         }
         self.move_logs.append(self.last_move)
@@ -367,6 +434,14 @@ class MatchReferee:
             "move_number": self.board.move_number,
             "halfmove_clock": self.board.halfmove_clock,
             "in_check": self.board.is_in_check(),
+            # Chờ người chơi = tới lượt người và trận chưa xong. Suy ra trực tiếp thay vì
+            # giữ một biến trạng thái riêng, vì hai nguồn sự thật sẽ lệch nhau.
+            "waiting_for_human": self._is_human_turn() and not self.game_over,
+            "is_human_turn": self._is_human_turn() and not self.game_over,
+            # Chỉ gửi danh sách nước hợp lệ khi tới lượt người, để giao diện highlight ô đi
+            # được mà không phải nhân bản luật cờ sang JavaScript (hai nguồn sự thật dễ lệch)
+            "legal_moves": (self.board.generate_legal_moves()
+                            if self._is_human_turn() and not self.game_over else []),
             "game_over": self.game_over,
             "winner": self.winner,
             "winner_side": self.winner_side,

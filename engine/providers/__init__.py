@@ -36,6 +36,10 @@ def create_provider(model_key, api_key=None, effort=None, analysis_engine=None):
     if model_info.provider == "mock":
         return MockProvider(model_info), None
 
+    if model_info.provider == "human":
+        from engine.providers.human_provider import HumanProvider
+        return HumanProvider(model_info), None
+
     if model_info.provider == "pikafish":
         from engine.providers.pikafish_provider import PikafishProvider
         return PikafishProvider(model_info, engine=analysis_engine), None

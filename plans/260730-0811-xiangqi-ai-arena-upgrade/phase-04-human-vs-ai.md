@@ -1,6 +1,6 @@
 # Phase 4 — Chế độ Người vs AI
 
-**Status:** pending | **Est:** ~0.5 ngày | **Depends:** Phase 2 (chấm điểm), Phase 3 (persist)
+**Status:** ✅ XONG (2026-07-30) | **Est:** ~0.5 ngày | **Depends:** Phase 2 (chấm điểm), Phase 3 (persist)
 
 ## Vì sao cần
 
@@ -56,9 +56,9 @@ Smoke | Trận Người vs mock: đi 5 nước qua API, accuracy của người 
 
 ## Acceptance criteria
 
-- [ ] Chọn "Người chơi" cho bên Đỏ hoặc Đen trong hộp thoại cấu hình
-- [ ] Click quân hiện đúng các ô đi được (lấy từ backend)
-- [ ] Nước sai luật hiện lý do tiếng Việt, không đi được
-- [ ] Auto-play dừng đúng ở lượt người
-- [ ] Accuracy % của người được chấm và so sánh trực tiếp với AI
-- [ ] Nước dùng hint bị đánh dấu riêng
+- [x] Chọn "Người chơi" cho bên Đỏ hoặc Đen trong hộp thoại cấu hình
+- [x] Click quân hiện đúng các ô đi được (lấy từ backend)
+- [x] Nước sai luật hiện lý do tiếng Việt, không đi được
+- [x] Auto-play dừng đúng ở lượt người
+- [x] Accuracy % của người được chấm và so sánh trực tiếp với AI
+- [x] Nước dùng hint bị đánh dấu riêng

@@ -75,6 +75,42 @@ def reset_match():
     return jsonify(referee.get_state())
 
 
+@app.route("/api/human-move", methods=["POST"])
+@app.route("/api/matches/<match_id>/human-move", methods=["POST"])
+def submit_human_move(match_id=None):
+    """
+    Nhận nước đi của người chơi.
+
+    Xác thực bằng đúng bộ luật dùng cho AI; nước sai trả 400 kèm lý do tiếng Việt để giao
+    diện hiện được, thay vì im lặng bỏ qua.
+    """
+    referee, error = _resolve_match(match_id)
+    if error:
+        return error
+
+    ucci = (request.get_json(silent=True) or {}).get("ucci", "")
+    success, message = referee.submit_human_move(ucci)
+    if not success:
+        return jsonify({"error": message, "state": referee.get_state()}), 400
+    return jsonify(referee.get_state())
+
+
+@app.route("/api/hint", methods=["POST"])
+@app.route("/api/matches/<match_id>/hint", methods=["POST"])
+def request_hint(match_id=None):
+    """Gợi ý nước đi từ engine. Lượt dùng gợi ý bị đánh dấu để không thổi phồng độ chính xác."""
+    referee, error = _resolve_match(match_id)
+    if error:
+        return error
+    if not referee._is_human_turn():
+        return jsonify({"error": "Chỉ gợi ý được ở lượt của người chơi"}), 400
+
+    bestmove, note = referee.request_hint()
+    if bestmove is None:
+        return jsonify({"error": note}), 400
+    return jsonify({"ucci": bestmove, "vi_text": note})
+
+
 @app.route("/api/matches", methods=["GET"])
 def list_matches():
     return jsonify({"matches": manager.list_matches(), "current": manager.current_match_id})

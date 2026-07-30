@@ -83,6 +83,17 @@ quân, hoà khi lặp lại thế cờ 3 lần.
 Đơn giản hoá hiện tại: luật xử phạt chiếu tướng liên tục / vây bắt liên tục theo chuẩn Á Châu
 chưa cài, các thế này được xử **hoà** kèm cờ cảnh báo `draw_perpetual_check`.
 
+## Chơi thử với AI
+
+Vào ⚙️ Cấu Hình, chọn **Người chơi (bạn)** cho bên Đỏ hoặc Đen, rồi bấm 🔄 Trận Mới.
+
+- Bấm vào quân của mình → hiện chấm gợi ý các ô đi được (danh sách lấy từ máy chủ, không
+  nhân bản luật cờ sang trình duyệt)
+- Nước sai luật bị từ chối kèm lý do tiếng Việt, y như khi AI đi sai
+- Tự động đấu **dừng lại** ở lượt bạn, không tự đi thay
+- 💡 Gợi Ý cho biết engine khuyên nước nào; nước dùng gợi ý bị **đánh dấu riêng** để độ
+  chính xác của bạn không bị thổi phồng khi so với AI
+
 ## Xem lại, giải đấu và overlay
 
 ```bash
@@ -119,4 +130,4 @@ Xem [plans/260730-0811-xiangqi-ai-arena-upgrade/plan.md](plans/260730-0811-xiang
 - **Phase 1** (xong) — sửa tính đúng đắn luật cờ + an toàn vận hành
 - **Phase 2** (xong) — Pikafish chấm điểm, tầng provider dùng SDK, prompt đầy đủ ngữ cảnh, nhiều trận song song
 - **Phase 3** (xong) — lưu SQLite, xem lại miễn phí, giải vòng tròn, Elo, overlay OBS, báo cáo trận
-- **Phase 4** — chế độ Người vs AI
+- **Phase 4** (xong) — chế độ Người vs AI

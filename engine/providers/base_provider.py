@@ -54,6 +54,9 @@ class MoveDecision:
 class MoveProvider(ABC):
     """Một kỳ thủ: nhận prompt + danh sách nước hợp lệ, trả về quyết định."""
 
+    # Kỳ thủ người thì trọng tài phải DỪNG chờ thao tác chuột, không gọi decide()
+    is_human = False
+
     def __init__(self, model_info, api_key=None):
         self.model_info = model_info
         self.api_key = api_key
