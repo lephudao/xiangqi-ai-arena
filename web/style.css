@@ -596,11 +596,14 @@ input:checked + .slider::before { transform: translateX(18px); }
     min-height: 0;
     border-radius: 11px;
     overflow: hidden;
-    background: #0f172a;
+    /* Nền chính là phần của ĐEN. Trước đây để #0f172a — trùng đúng màu nền trang, nên phần
+       của Đen vô hình và thanh trông như chỉ có một màu đỏ. Dùng tông bạc giống màu quân
+       Đen trên bàn cờ: tương phản mạnh với đỏ và không phụ thuộc khả năng phân biệt đỏ/lục. */
+    background: linear-gradient(180deg, #e2e8f0, #94a3b8);
     border: 1px solid var(--border-color);
 }
 
-/* Nửa dưới = Đỏ, nửa trên = Đen. Chiều cao phần Đỏ biểu thị ưu thế của Đỏ. */
+/* Phần dưới = Đỏ, phần trên = Đen. Chiều cao phần Đỏ biểu thị ưu thế của Đỏ. */
 .eval-bar-fill {
     position: absolute;
     bottom: 0;
@@ -611,13 +614,15 @@ input:checked + .slider::before { transform: translateX(18px); }
     transition: height 0.5s ease;
 }
 
+/* Vạch mốc cân bằng, giúp nhìn ra ngay bên nào đang vượt mốc 50% */
 .eval-bar-midline {
     position: absolute;
     top: 50%;
     left: 0;
     right: 0;
-    height: 1px;
-    background: rgba(255, 255, 255, 0.5);
+    height: 2px;
+    background: rgba(15, 23, 42, 0.55);
+    z-index: 2;
 }
 
 .eval-value {
