@@ -1,6 +1,6 @@
 # Xiangqi AI Arena — Nâng cấp thành "cuộc chiến AI thực thụ"
 
-**Status:** Phase 1 XONG · Phase 2 XONG · Phase 3 chưa bắt đầu | **Created:** 2026-07-30 | **Owner:** lephudao
+**Status:** Phase 1 XONG · Phase 2 XONG · Phase 3 XONG · Phase 4 (Người vs AI) chưa bắt đầu | **Created:** 2026-07-30 | **Owner:** lephudao
 
 ## Mục tiêu
 
@@ -24,7 +24,7 @@ Biến hệ thống hiện tại (demo chạy được) thành đấu trường 
 |-------|----------|------|---------|------|
 | 1 | Sửa tính đúng đắn luật cờ + an toàn vận hành | [phase-01-rules-correctness.md](phase-01-rules-correctness.md) | ✅ XONG | ~1 ngày |
 | 2 | Pikafish chấm điểm + provider layer + prompt thật | [phase-02-real-ai-battle.md](phase-02-real-ai-battle.md) | ✅ XONG | ~2 ngày |
-| 3 | Persist + replay + tournament + Elo + overlay OBS | [phase-03-content-production.md](phase-03-content-production.md) | 🟡 Scale content | ~2 ngày |
+| 3 | Persist + replay + tournament + Elo + overlay OBS | [phase-03-content-production.md](phase-03-content-production.md) | ✅ XONG | ~2 ngày |
 | 4 | Chế độ Người vs AI | [phase-04-human-vs-ai.md](phase-04-human-vs-ai.md) | 🟡 Content mới | ~0.5 ngày |
 
 **Dependencies:** Phase 2 phụ thuộc Phase 1 (chấm điểm vô nghĩa nếu nước đi sai luật). Phase 3 phụ thuộc Phase 2 (persist cần schema eval). Phase 4 phụ thuộc Phase 2+3. Trong mỗi phase các task tuần tự.
@@ -36,10 +36,10 @@ Biến hệ thống hiện tại (demo chạy được) thành đấu trường 
 - [x] Pikafish chấm được mọi nước; UI hiện eval bar + nhãn chất lượng (Hay/Sai/Blunder)
 - [x] 5+ provider hoạt động: OpenAI, Gemini, Anthropic, Grok, DeepSeek (+ Pikafish làm player boss)
 - [x] Nước sai luật của AI được **đếm và log**, không bị âm thầm thay bằng random
-- [ ] Trận lưu vào SQLite; replay lại được từ DB không gọi API
-- [ ] `scripts/run-tournament.py` chạy round-robin không cần bấm nút
-- [ ] Elo leaderboard cập nhật sau mỗi trận
-- [ ] Chế độ `?overlay=1` cho OBS browser source, không có UI chrome
+- [x] Trận lưu vào SQLite; replay lại được từ DB không gọi API
+- [x] `scripts/run-tournament.py` chạy round-robin không cần bấm nút
+- [x] Elo leaderboard cập nhật sau mỗi trận
+- [x] Chế độ `?overlay=1` cho OBS browser source, không có UI chrome
 
 ## Quyết định thiết kế quan trọng
 

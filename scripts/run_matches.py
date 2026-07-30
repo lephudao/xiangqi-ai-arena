@@ -6,11 +6,15 @@ Có hai chặn an toàn bắt buộc, vì mỗi nước đi là một lần gọ
 - --max-moves: trận không kết thúc thì xử hoà theo giới hạn nước, không chạy vô hạn
 - --max-cost-usd: chạm ngưỡng thì dừng sạch và ghi lại tiến độ
 
-Ví dụ:
-  venv/bin/python3 scripts/run_matches.py \
-      --pairing claude-haiku-4-5:gemini-3.1-pro \
-      --pairing claude-haiku-4-5:pikafish \
-      --max-moves 140 --max-cost-usd 2.00
+Hai chế độ:
+  # Chỉ định từng cặp đấu
+  scripts/run_matches.py --pairing claude-haiku-4-5:gemini-3.6-flash --max-cost-usd 2.00
+
+  # Giải vòng tròn: mọi cặp đánh cả hai màu (Đỏ đi trước có lợi nên bắt buộc đổi màu)
+  scripts/run_matches.py --round-robin claude-haiku-4-5,gemini-3.6-flash,pikafish \
+      --max-moves 140 --max-cost-usd 5.00
+
+Kết quả ghi thẳng vào cơ sở dữ liệu nên xem lại được ngay trên giao diện và Elo tự cập nhật.
 """
 
 import argparse
@@ -29,17 +33,35 @@ load_dotenv(".env.local", override=True)
 
 from engine.analysis import PikafishEngine, average_accuracy  # noqa: E402
 from engine.referee import MatchReferee  # noqa: E402
+from engine.storage import MatchRepository  # noqa: E402
 
 OUTPUT_DIR = "data/matches"
 
 
-def run_match(red_key, black_key, max_moves, cost_budget_left, analysis_engine):
+def round_robin_pairings(model_keys):
+    """
+    Mọi cặp đánh hai lượt, đổi màu.
+
+    Bên Đỏ đi trước nên có lợi thế; nếu mỗi cặp chỉ đánh một lượt thì bảng xếp hạng phản
+    ánh may mắn bốc màu chứ không phải sức mạnh.
+    """
+    pairings = []
+    for index, first in enumerate(model_keys):
+        for second in model_keys[index + 1:]:
+            pairings.append((first, second))
+            pairings.append((second, first))
+    return pairings
+
+
+def run_match(red_key, black_key, max_moves, cost_budget_left, analysis_engine, repository=None):
     """Chạy một trận. Trả (bản ghi trận, chi phí đã dùng)."""
     referee = MatchReferee(
         {"model_key": red_key},
         {"model_key": black_key},
         analysis_engine=analysis_engine,
     )
+    if repository is not None:
+        referee.attach_recorder(repository)
     red_name = referee.red_config["name"]
     black_name = referee.black_config["name"]
     print(f"\n{'=' * 78}\n{red_name} (Đỏ)  vs  {black_name} (Đen)\n{'=' * 78}", flush=True)
@@ -95,6 +117,14 @@ def run_match(red_key, black_key, max_moves, cost_budget_left, analysis_engine):
         "stats": state["stats"],
         "moves": referee.move_logs,
     }
+    # Ghi lý do dừng ngoài luật cờ để bảng xếp hạng biết mà loại trận này khỏi Elo
+    if repository is not None and stopped_reason is not None:
+        repository.finish_match(
+            referee.record_id, state,
+            {"red": referee.stats['w'], "black": referee.stats['b']},
+            stopped_reason=stopped_reason,
+        )
+
     _print_summary(record, referee)
     return record, (_match_cost(referee) or 0.0)
 
@@ -127,8 +157,12 @@ def _print_summary(record, referee):
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--pairing", action="append", required=True,
-                        metavar="RED:BLACK", help="cặp đấu, ví dụ claude-haiku-4-5:gemini-3.1-pro")
+    parser.add_argument("--pairing", action="append", metavar="RED:BLACK",
+                        help="cặp đấu, ví dụ claude-haiku-4-5:gemini-3.6-flash")
+    parser.add_argument("--round-robin", metavar="A,B,C",
+                        help="giải vòng tròn: mọi cặp đánh cả hai màu")
+    parser.add_argument("--no-db", action="store_true",
+                        help="không ghi vào cơ sở dữ liệu (chỉ xuất file JSON)")
     parser.add_argument("--max-moves", type=int, default=140,
                         help="giới hạn số nước mỗi trận (mặc định 140)")
     parser.add_argument("--max-cost-usd", type=float, default=2.0,
@@ -136,16 +170,27 @@ def main():
     parser.add_argument("--out-dir", default=OUTPUT_DIR)
     args = parser.parse_args()
 
+    pairings = list(args.pairing or [])
+    if args.round_robin:
+        models = [key.strip() for key in args.round_robin.split(",") if key.strip()]
+        if len(models) < 2:
+            parser.error("--round-robin cần ít nhất 2 model")
+        pairings += [f"{red}:{black}" for red, black in round_robin_pairings(models)]
+    if not pairings:
+        parser.error("cần --pairing hoặc --round-robin")
+
     os.makedirs(args.out_dir, exist_ok=True)
+    repository = None if args.no_db else MatchRepository()
     # Một tiến trình engine dùng chung cho cả chấm điểm và kỳ thủ Pikafish
     analysis_engine = PikafishEngine()
     if not analysis_engine.is_available:
         print(f"CẢNH BÁO: {analysis_engine.unavailable_reason}\n"
               f"-> Trận vẫn chạy nhưng KHÔNG có điểm chấm chất lượng nước đi.", flush=True)
 
+    print(f"Sẽ chạy {len(pairings)} trận, ngân sách tổng ${args.max_cost_usd}", flush=True)
     total_spent = 0.0
     records = []
-    for pairing in args.pairing:
+    for pairing in pairings:
         if ":" not in pairing:
             parser.error(f"cặp đấu '{pairing}' phải có dạng RED:BLACK")
         red_key, black_key = pairing.split(":", 1)
@@ -155,7 +200,8 @@ def main():
             print(f"\nDỪNG TOÀN BỘ: đã dùng hết ngân sách ${args.max_cost_usd}", flush=True)
             break
 
-        record, spent = run_match(red_key, black_key, args.max_moves, budget_left, analysis_engine)
+        record, spent = run_match(red_key, black_key, args.max_moves, budget_left,
+                                  analysis_engine, repository)
         total_spent += spent
         records.append(record)
 
@@ -167,11 +213,21 @@ def main():
         print(f"  Đã lưu: {path}  |  tổng chi phí tới lúc này: ${total_spent:.4f}", flush=True)
 
     analysis_engine.close()
-    print(f"\n{'=' * 78}\nXONG {len(records)} trận. Tổng chi phí: ${total_spent:.4f}")
+    print(f"\n{'=' * 78}\nXONG {len(records)}/{len(pairings)} trận. "
+          f"Tổng chi phí: ${total_spent:.4f}")
     for record in records:
         print(f"  {record['red']['name']} vs {record['black']['name']}: "
               f"{record['result_reason']} ({record['winner'] or 'hoà'}) "
               f"sau {record['total_plies']} nước")
+
+    if repository is not None:
+        leaderboard = repository.leaderboard()
+        if leaderboard:
+            print("\nBẢNG XẾP HẠNG ELO (chỉ tính trận kết thúc đúng luật cờ):")
+            for rank, row in enumerate(leaderboard, start=1):
+                print(f"  {rank}. {row['label']:24s} Elo {row['elo']:7.1f}  "
+                      f"{row['matches']} trận  {row['wins']}W-{row['draws']}D-{row['losses']}L")
+        repository.close()
 
 
 if __name__ == "__main__":

@@ -930,3 +930,30 @@ body.replay-mode .budget-input {
     color: var(--text-muted);
     font-size: 13px;
 }
+
+/* ===== Chế độ overlay cho OBS (?overlay=1) =====
+   Ẩn mọi nút bấm và thanh công cụ để khung hình chỉ còn nội dung trận đấu.
+   Thêm &transparent=1 để nền trong suốt, chồng lớp lên cảnh khác trong OBS. */
+body.overlay-mode .header-controls,
+body.overlay-mode .studio-footer,
+body.overlay-mode .replay-bar,
+body.overlay-mode .modal-overlay {
+    display: none !important;
+}
+
+body.overlay-mode .broadcast-layout {
+    height: calc(100vh - 62px);
+}
+
+body.overlay-transparent,
+body.overlay-transparent .studio-container {
+    background: transparent !important;
+}
+
+body.overlay-transparent .studio-header {
+    background: rgba(15, 23, 42, 0.65);
+}
+
+body.overlay-transparent .player-card {
+    background: rgba(15, 23, 42, 0.72);
+}

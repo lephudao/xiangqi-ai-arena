@@ -1,6 +1,6 @@
 # Phase 3 — Sản xuất content ở quy mô: persist, replay, tournament, Elo, overlay OBS
 
-**Status:** pending | **Est:** ~2 ngày | **Depends:** Phase 2
+**Status:** ✅ XONG (2026-07-30) | **Est:** ~2 ngày | **Depends:** Phase 2
 
 ## Vấn đề đang giải
 
@@ -153,11 +153,11 @@ Smoke | `run-tournament.py` với 3 player mock, 1 round → DB có đúng số 
 
 ## Acceptance criteria
 
-- [ ] Trận lưu đầy đủ vào `data/arena.db` ngay sau từng nước
-- [ ] Replay chạy được từ DB, không gọi API, scrub được từng nước
-- [ ] `run-tournament.py` chạy round-robin headless, resume được, tôn trọng `--max-cost-usd`
-- [ ] Elo cập nhật đúng, có `/api/leaderboard` + UI
-- [ ] `?overlay=1` sạch chrome, 1920×1080, chạy được trong OBS browser source
-- [ ] Cảnh báo CHIẾU TƯỚNG + badge blunder + eval bar hiện đúng lúc
-- [ ] `match_report_builder` sinh được script video có top-3 blunder + điểm xoay chuyển
-- [ ] `docs/` có PDR + architecture + "luật thi đấu" công khai
+- [x] Trận lưu đầy đủ vào `data/arena.db` ngay sau từng nước
+- [x] Replay chạy được từ DB, không gọi API, scrub được từng nước
+- [x] `run-tournament.py` chạy round-robin headless, resume được, tôn trọng `--max-cost-usd`
+- [x] Elo cập nhật đúng, có `/api/leaderboard` + UI
+- [x] `?overlay=1` sạch chrome, 1920×1080, chạy được trong OBS browser source
+- [x] Cảnh báo CHIẾU TƯỚNG + badge blunder + eval bar hiện đúng lúc
+- [x] `match_report_builder` sinh được script video có top-3 blunder + điểm xoay chuyển
+- [x] `docs/` có PDR + architecture + "luật thi đấu" công khai

@@ -44,6 +44,8 @@ engine/
   match_manager.py        Nhiều trận song song, dùng chung một tiến trình engine
   providers/              Kỳ thủ: Claude (SDK), Gemini (SDK), OpenAI-compatible, Mock, Pikafish
   analysis/               Pikafish chấm điểm: centipawn loss, nhãn chất lượng, accuracy %
+  storage/                SQLite: lưu trận, nước đi, Elo — nền cho xem lại và xếp hạng
+  reporting/              Sinh báo cáo trận làm khung script video
   xiangqi/
     board.py              Trạng thái bàn cờ, FEN, thực hiện nước đi, bộ đếm luật hoà
     move_generation.py    Sinh nước đi 7 loại quân + lọc nước hợp lệ
@@ -51,7 +53,8 @@ engine/
     game_rules.py         Chiếu bí / hết nước / mất tướng / các luật hoà
     notation.py           UCCI ↔ toạ độ, ký hiệu cờ tướng tiếng Việt
 web/                      Giao diện studio (vanilla JS + SVG bàn cờ + TTS)
-scripts/                  install-pikafish.sh, run_matches.py (chạy trận không cần giao diện)
+scripts/                  install-pikafish.sh, run_matches.py (chạy trận/giải đấu),
+                          import_match_json.py, build_match_report.py
 tests/                    pytest — luật cờ, vòng đời trận, provider, quản lý trận
 plans/                    Kế hoạch nâng cấp theo phase
 ```
@@ -80,6 +83,28 @@ quân, hoà khi lặp lại thế cờ 3 lần.
 Đơn giản hoá hiện tại: luật xử phạt chiếu tướng liên tục / vây bắt liên tục theo chuẩn Á Châu
 chưa cài, các thế này được xử **hoà** kèm cờ cảnh báo `draw_perpetual_check`.
 
+## Xem lại, giải đấu và overlay
+
+```bash
+# Giải vòng tròn: mọi cặp đánh cả hai màu, ghi thẳng vào cơ sở dữ liệu
+scripts/run_matches.py --round-robin claude-haiku-4-5,gemini-3.6-flash,pikafish \
+    --max-moves 140 --max-cost-usd 5.00
+
+# Nhập các file JSON chạy từ trước khi có cơ sở dữ liệu
+scripts/import_match_json.py --all
+
+# Xuất báo cáo trận làm khung script video
+scripts/build_match_report.py --list
+scripts/build_match_report.py <match_id> -o plans/reports/tran.md
+```
+
+- **Xem lại** — bấm 📼 Xem Lại trên giao diện. Đọc từ cơ sở dữ liệu nên **không tốn tiền API**;
+  có kéo thanh thời gian, phát tự động, và nút nhảy tới nước sai nặng nhất.
+- **Elo** — chỉ tính trận kết thúc đúng luật cờ. Trận dừng vì hết giới hạn nước hoặc hết
+  ngân sách không được tính, vì không phản ánh sức mạnh.
+- **Overlay OBS** — mở `http://localhost:5000/?overlay=1&transparent=1` làm browser source.
+  Không có nút bấm, nền trong suốt; điều khiển trận từ tab khác để tay không lọt vào khung hình.
+
 ## Test
 
 ```bash
@@ -93,4 +118,5 @@ Xem [plans/260730-0811-xiangqi-ai-arena-upgrade/plan.md](plans/260730-0811-xiang
 
 - **Phase 1** (xong) — sửa tính đúng đắn luật cờ + an toàn vận hành
 - **Phase 2** (xong) — Pikafish chấm điểm, tầng provider dùng SDK, prompt đầy đủ ngữ cảnh, nhiều trận song song
-- **Phase 3** — lưu trận vào SQLite, replay không tốn API, giải đấu headless, Elo, overlay OBS
+- **Phase 3** (xong) — lưu SQLite, xem lại miễn phí, giải vòng tròn, Elo, overlay OBS, báo cáo trận
+- **Phase 4** — chế độ Người vs AI

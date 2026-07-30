@@ -14,6 +14,7 @@ let availableModels = [];
 let replay = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
+    applyOverlayMode();
     renderBoardGrid(document.getElementById('board'));
     await loadModels();
     fetchState();
@@ -29,6 +30,27 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     setupReplay();
 });
+
+/**
+ * Chế độ overlay cho OBS: ?overlay=1
+ *
+ * Ẩn toàn bộ nút bấm và thanh công cụ, nền trong suốt để chồng lớp trong OBS. Điều khiển
+ * trận bằng tab khác hoặc gọi API từ máy khác — nhờ đó tay bấm không lọt vào khung hình.
+ * Dùng lại chính trang này thay vì nhân bản mã, để hai chế độ không bị lệch nhau.
+ */
+function applyOverlayMode() {
+    const params = new URLSearchParams(location.search);
+    if (params.get('overlay') !== '1') return;
+
+    document.body.classList.add('overlay-mode');
+    // Nền trong suốt chỉ khi được yêu cầu; mặc định giữ nền tối để xem trên trình duyệt
+    if (params.get('transparent') === '1') {
+        document.body.classList.add('overlay-transparent');
+    }
+    // Tự làm mới để overlay bám theo trận đang chạy ở tab điều khiển
+    const refreshMs = parseInt(params.get('refresh'), 10) || 1000;
+    setInterval(() => { if (!replay || !replay.isActive) fetchState(); }, refreshMs);
+}
 
 // ===== Xem lại trận đã lưu (đọc từ cơ sở dữ liệu, không gọi API AI) =====
 

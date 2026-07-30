@@ -138,6 +138,23 @@ def get_replay(match_id):
     return jsonify({"match": match, "moves": manager.repository.get_moves(match_id)})
 
 
+@app.route("/api/replays/<match_id>/report", methods=["GET"])
+def get_match_report(match_id):
+    """
+    Báo cáo trận dạng Markdown — khung sẵn để viết script video: độ chính xác hai bên,
+    ba nước hỏng nặng nhất, điểm xoay chuyển trận và gợi ý tiêu đề.
+    """
+    from engine.reporting import render_markdown
+
+    if manager.repository is None:
+        return jsonify({"error": "Chưa bật lưu trữ trận"}), 404
+    match = manager.repository.get_match(match_id)
+    if match is None:
+        return jsonify({"error": f"Không có trận '{match_id}'"}), 404
+    markdown = render_markdown(match, manager.repository.get_moves(match_id))
+    return app.response_class(markdown, mimetype="text/markdown; charset=utf-8")
+
+
 @app.route("/api/leaderboard", methods=["GET"])
 def get_leaderboard():
     """Bảng xếp hạng Elo — chỉ tính các trận kết thúc đúng luật cờ."""
