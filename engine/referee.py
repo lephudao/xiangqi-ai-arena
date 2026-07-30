@@ -1,138 +1,225 @@
 """
-Xiangqi Referee & Match Controller
-Manages game state, turn delegation, referee commentary, and match lifecycle.
+Trọng tài & điều khiển trận đấu: quản lý trạng thái ván, phân lượt, và ghi nhận vi phạm.
+
+Trọng tài là bên DUY NHẤT xác thực nước đi. Khi AI đưa nước sai luật, trọng tài cho đi lại
+tối đa MAX_MOVE_ATTEMPTS lần kèm lý do cụ thể, đếm số lần sai, và chỉ chọn thay khi AI
+hoàn toàn không đưa được nước hợp lệ.
 """
 
-from engine.xiangqi_engine import XiangqiBoard
 from engine.ai_agent import AIAgent
+from engine.xiangqi import STATUS_DRAW, STATUS_ONGOING, XiangqiBoard
+
+MAX_MOVE_ATTEMPTS = 3
+REFEREE_LOG_LIMIT = 200
+
+DEFAULT_RED_CONFIG = {"name": "ChatGPT (Đỏ)", "provider": "mock", "model": "mock-red"}
+DEFAULT_BLACK_CONFIG = {"name": "Claude (Đen)", "provider": "mock", "model": "mock-black"}
+
+RESULT_MESSAGES_VI = {
+    "checkmate": "CHIẾU BÍ",
+    "stalemate": "HẾT NƯỚC ĐI (bị vây chết)",
+    "king_captured": "MẤT TƯỚNG",
+    "draw_60_moves": "HOÀ — 60 nước không ăn quân",
+    "draw_repetition": "HOÀ — lặp lại thế cờ 3 lần",
+    "draw_perpetual_check": "HOÀ — nghi vấn chiếu liên tục",
+}
+
+
+def _new_player_stats():
+    return {"illegal_attempts": 0, "api_errors": 0, "moves": 0, "total_latency_ms": 0}
+
 
 class MatchReferee:
     def __init__(self, red_config=None, black_config=None):
-        self.board = XiangqiBoard()
-        self.red_config = red_config or {"name": "ChatGPT (Đỏ)", "provider": "mock", "model": "mock-red"}
-        self.black_config = black_config or {"name": "Claude (Đen)", "provider": "mock", "model": "mock-black"}
-        
-        self.red_agent = AIAgent(
-            provider=self.red_config.get("provider", "mock"),
-            model_name=self.red_config.get("model", ""),
-            api_key=self.red_config.get("api_key", "")
-        )
-        self.black_agent = AIAgent(
-            provider=self.black_config.get("provider", "mock"),
-            model_name=self.black_config.get("model", ""),
-            api_key=self.black_config.get("api_key", "")
+        self.red_config = red_config or dict(DEFAULT_RED_CONFIG)
+        self.black_config = black_config or dict(DEFAULT_BLACK_CONFIG)
+        self._start_new_game(
+            f"Trọng tài: Trận đấu giữa {self.red_config['name']} và "
+            f"{self.black_config['name']} chính thức BẮT ĐẦU!"
         )
 
+    def _build_agent(self, config):
+        return AIAgent(
+            provider=config.get("provider", "mock"),
+            model_name=config.get("model", ""),
+            api_key=config.get("api_key", ""),
+        )
+
+    def _start_new_game(self, opening_message):
+        self.board = XiangqiBoard()
+        self.red_agent = self._build_agent(self.red_config)
+        self.black_agent = self._build_agent(self.black_config)
+
         self.game_over = False
-        self.winner = None
+        self.winner = None            # tên người thắng, None nếu hoà/đang đấu
+        self.result_status = STATUS_ONGOING
+        self.result_reason = STATUS_ONGOING
         self.last_move = None
         self.move_logs = []
-        self.referee_log = ["Trọng tài Python: Trận đấu Cờ Tướng giữa " + self.red_config["name"] + " và " + self.black_config["name"] + " chính thức BẮT ĐẦU!"]
+        self.stats = {'w': _new_player_stats(), 'b': _new_player_stats()}
+        self.referee_log = [opening_message]
 
     def reset(self, red_config=None, black_config=None):
         if red_config:
             self.red_config = red_config
         if black_config:
             self.black_config = black_config
+        self._start_new_game("Trọng tài: Trận mới BẮT ĐẦU!")
 
-        self.board = XiangqiBoard()
-        self.red_agent = AIAgent(
-            provider=self.red_config.get("provider", "mock"),
-            model_name=self.red_config.get("model", ""),
-            api_key=self.red_config.get("api_key", "")
-        )
-        self.black_agent = AIAgent(
-            provider=self.black_config.get("provider", "mock"),
-            model_name=self.black_config.get("model", ""),
-            api_key=self.black_config.get("api_key", "")
-        )
+    # --- Thông tin bên đang đi ---
 
-        self.game_over = False
-        self.winner = None
-        self.last_move = None
-        self.move_logs = []
-        self.referee_log = ["Trọng tài Python: Trận đấu đã được lập lại thành công! Trận mới BẮT ĐẦU!"]
+    def _player_name(self, side):
+        return self.red_config["name"] if side == 'w' else self.black_config["name"]
+
+    def _agent(self, side):
+        return self.red_agent if side == 'w' else self.black_agent
+
+    def _log(self, message):
+        self.referee_log.append(message)
+        if len(self.referee_log) > REFEREE_LOG_LIMIT:
+            del self.referee_log[:-REFEREE_LOG_LIMIT]
+
+    # --- Vòng đời trận đấu ---
 
     def step(self):
-        """
-        Executes one turn of the match.
-        Returns match update state dict.
-        """
+        """Chạy một lượt của trận đấu. Trả về state dict."""
         if self.game_over:
             return self.get_state()
 
-        current_turn = self.board.turn  # 'w' for Red, 'b' for Black
-        side_name = self.red_config["name"] if current_turn == 'w' else self.black_config["name"]
-        agent = self.red_agent if current_turn == 'w' else self.black_agent
-
-        legal_moves = self.board.generate_legal_moves(current_turn)
-
-        if not legal_moves:
-            self.game_over = True
-            opponent_name = self.black_config["name"] if current_turn == 'w' else self.red_config["name"]
-            self.winner = opponent_name
-            ref_msg = f"Trọng tài: {side_name} đã HẾT NƯỚC ĐỊ HỢP LỆ! {opponent_name} GIÀNH CHIẾN THẮNG!"
-            self.referee_log.append(ref_msg)
+        # Kiểm tra kết thúc trước khi đi (chiếu bí / hết nước / hoà)
+        result = self.board.evaluate_result()
+        if result.is_over:
+            self._finish(result)
             return self.get_state()
 
-        # Request move from AI
-        fen = self.board.to_fen()
-        ai_res = agent.get_move(fen, legal_moves, side_name, current_turn)
+        side = self.board.turn
+        legal_moves = self.board.generate_legal_moves(side)
+        decision, attempts = self._request_legal_move(side, legal_moves)
 
-        ucci_move = ai_res.get("move_ucci", "")
-        reasoning = ai_res.get("reasoning", "")
+        chosen_move = decision.move_ucci
+        referee_override = None
+        if chosen_move not in legal_moves:
+            # AI không đưa được nước hợp lệ sau tất cả các lần thử -> trọng tài chọn thay
+            chosen_move = legal_moves[0]
+            referee_override = chosen_move
+            self._log(
+                f"Trọng tài: {self._player_name(side)} không đưa được nước hợp lệ sau "
+                f"{len(attempts)} lần thử ({', '.join(attempts) or 'không có phản hồi'}). "
+                f"Trọng tài chọn thay: {chosen_move}"
+            )
 
-        # Push move into board
-        success, msg = self.board.push_ucci(ucci_move)
-
+        vi_notation = self.board.to_vietnamese_notation(chosen_move)
+        success, message = self.board.push_ucci(chosen_move)
         if not success:
-            # Fallback if invalid
-            fallback_move = legal_moves[0]
-            self.board.push_ucci(fallback_move)
-            ref_msg = f"Trọng tài: {side_name} đưa nước đi lỗi ('{ucci_move}'). Trọng tài bắt buộc chọn lại '{fallback_move}'!"
-            self.referee_log.append(ref_msg)
-            vi_text = self.board.move_to_vietnamese_text(fallback_move)
-            self.last_move = {
-                "side": current_turn,
-                "player": side_name,
-                "ucci": fallback_move,
-                "vi_text": vi_text,
-                "reasoning": reasoning + " (Trọng tài đã điều chỉnh nước đi)"
-            }
-        else:
-            vi_text = self.board.move_to_vietnamese_text(ucci_move)
-            self.last_move = {
-                "side": current_turn,
-                "player": side_name,
-                "ucci": ucci_move,
-                "vi_text": vi_text,
-                "reasoning": reasoning
-            }
-            self.referee_log.append(f"Lượt #{len(self.move_logs)+1}: {side_name} đi {vi_text} [{ucci_move}]")
+            # Không nên xảy ra: chosen_move đã nằm trong legal_moves
+            self._log(f"Trọng tài: LỖI ENGINE khi thực hiện {chosen_move} — {message}")
+            self.game_over = True
+            self.result_reason = "engine_error"
+            return self.get_state()
 
+        self.stats[side]["moves"] += 1
+        self.stats[side]["total_latency_ms"] += decision.latency_ms
+
+        self.last_move = {
+            "side": side,
+            "player": self._player_name(side),
+            "ucci": chosen_move,
+            "vi_text": vi_notation,
+            "reasoning": decision.reasoning,
+            "attempts": attempts,
+            "referee_override": referee_override,
+            "latency_ms": decision.latency_ms,
+            "error": decision.error,
+        }
         self.move_logs.append(self.last_move)
 
-        # Check if next turn has legal moves
-        next_turn = self.board.turn
-        next_legal = self.board.generate_legal_moves(next_turn)
-        if not next_legal:
-            self.game_over = True
-            self.winner = side_name
-            self.referee_log.append(f"Trọng tài: CHIẾU BÍ! {side_name} CHIẾN THẮNG TRẬN ĐẤU!")
+        ply = len(self.move_logs)
+        self._log(f"Nước #{ply}: {self._player_name(side)} đi {vi_notation} [{chosen_move}]")
+
+        if self.board.is_in_check():
+            self._log(f"Trọng tài: CHIẾU TƯỚNG! {self._player_name(self.board.turn)} bị chiếu!")
+
+        result = self.board.evaluate_result()
+        if result.is_over:
+            self._finish(result)
 
         return self.get_state()
+
+    def _request_legal_move(self, side, legal_moves):
+        """
+        Xin nước đi, cho đi lại kèm lý do khi sai. Trả (decision cuối, danh sách nước đã thử).
+        """
+        agent = self._agent(side)
+        fen = self.board.to_fen()
+        in_check = self.board.is_in_check(side)
+        attempts = []
+        feedback = None
+        decision = None
+
+        for attempt_index in range(MAX_MOVE_ATTEMPTS):
+            decision = agent.get_move(
+                fen, legal_moves, self._player_name(side), side,
+                feedback=feedback, in_check=in_check,
+            )
+
+            if decision.error:
+                self.stats[side]["api_errors"] += 1
+                self._log(f"Trọng tài: Lỗi gọi API của {self._player_name(side)} — {decision.error}")
+                break
+
+            attempts.append(decision.move_ucci or "(rỗng)")
+            if decision.move_ucci in legal_moves:
+                if attempt_index > 0:
+                    self._log(
+                        f"Trọng tài: {self._player_name(side)} đi lại đúng luật ở lần thử "
+                        f"thứ {attempt_index + 1}"
+                    )
+                break
+
+            self.stats[side]["illegal_attempts"] += 1
+            feedback = self.board.explain_illegal_move(decision.move_ucci)
+            self._log(
+                f"Trọng tài: {self._player_name(side)} đi SAI LUẬT "
+                f"('{decision.move_ucci}') — {feedback}"
+            )
+
+        decision.attempts = attempts
+        return decision, attempts
+
+    def _finish(self, result):
+        self.game_over = True
+        self.result_status = result.status
+        self.result_reason = result.reason
+        reason_vi = RESULT_MESSAGES_VI.get(result.reason, result.reason)
+
+        if result.status == STATUS_DRAW:
+            self.winner = None
+            self._log(f"Trọng tài: TRẬN ĐẤU KẾT THÚC — {reason_vi}")
+        else:
+            self.winner = self._player_name(result.winner_side)
+            loser = self._player_name('b' if result.winner_side == 'w' else 'w')
+            self._log(f"Trọng tài: {reason_vi}! {self.winner} THẮNG ({loser} thua)")
+
+    # --- Trạng thái cho API ---
 
     def get_state(self):
         return {
             "fen": self.board.to_fen(),
-            "turn": self.board.turn,  # 'w' or 'b'
-            "turn_player": self.red_config["name"] if self.board.turn == 'w' else self.black_config["name"],
+            "turn": self.board.turn,
+            "turn_player": self._player_name(self.board.turn),
             "move_number": self.board.move_number,
+            "halfmove_clock": self.board.halfmove_clock,
+            "in_check": self.board.is_in_check(),
             "game_over": self.game_over,
             "winner": self.winner,
+            "result_status": self.result_status,
+            "result_reason": self.result_reason,
+            "result_text": RESULT_MESSAGES_VI.get(self.result_reason, ""),
             "last_move": self.last_move,
             "red_config": self.red_config,
             "black_config": self.black_config,
             "history_count": len(self.move_logs),
-            "referee_log": self.referee_log[-5:] # last 5 logs
+            "material": self.board.material_summary(),
+            "stats": {"red": self.stats['w'], "black": self.stats['b']},
+            "referee_log": self.referee_log[-5:],
         }

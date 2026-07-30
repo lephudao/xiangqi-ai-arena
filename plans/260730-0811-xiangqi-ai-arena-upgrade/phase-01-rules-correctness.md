@@ -1,6 +1,6 @@
 # Phase 1 — Sửa tính đúng đắn luật cờ + an toàn vận hành
 
-**Status:** pending | **Est:** ~1 ngày | **Blocks:** Phase 2, Phase 3
+**Status:** ✅ XONG (2026-07-30) | **Est:** ~1 ngày | **Blocks:** Phase 2, Phase 3
 
 ## Vì sao bắt buộc làm trước
 
@@ -186,14 +186,14 @@ Rollback: chưa có git repo (`Is a git repository: false`) → **việc đầu 
 
 ## Acceptance criteria
 
-- [ ] `git init` + commit baseline trước khi refactor
-- [ ] Toàn bộ test pass; perft khai cuộc = 44
-- [ ] Không nước nào để vua mình bị chiếu được sinh ra
-- [ ] Trận kết thúc đúng: chiếu bí / hết nước / hòa 60 nước / lặp 3 lần
-- [ ] `to_fen()` xuất halfmove clock đúng
-- [ ] Nước sai của AI được đếm + log, không âm thầm thay bằng random
-- [ ] API call có timeout 30s; API treo không làm chết server
-- [ ] `debug=False` mặc định; server bind 127.0.0.1
-- [ ] TTS đọc được "Pháo 2 bình 5"
-- [ ] Hết trận hiện banner, không có `alert()`
-- [ ] README.md tồn tại, mô tả cách chạy
+- [x] `git init` + commit baseline trước khi refactor
+- [x] Toàn bộ test pass; perft khai cuộc = 44
+- [x] Không nước nào để vua mình bị chiếu được sinh ra
+- [x] Trận kết thúc đúng: chiếu bí / hết nước / hòa 60 nước / lặp 3 lần
+- [x] `to_fen()` xuất halfmove clock đúng
+- [x] Nước sai của AI được đếm + log, không âm thầm thay bằng random
+- [x] API call có timeout 30s; API treo không làm chết server
+- [x] `debug=False` mặc định; server bind 127.0.0.1
+- [x] TTS đọc được "Pháo 2 bình 5"
+- [x] Hết trận hiện banner, không có `alert()`
+- [x] README.md tồn tại, mô tả cách chạy

@@ -20,6 +20,7 @@
             </div>
             <div class="match-info">
                 <span id="turn-badge" class="turn-indicator turn-red">LƯỢT QUÂN ĐỎ</span>
+                <span id="check-alert" class="check-alert">⚠️ CHIẾU TƯỚNG!</span>
                 <span id="move-counter" class="move-badge">Lượt: #1</span>
             </div>
             <div class="header-controls">
@@ -39,6 +40,10 @@
                 <div class="player-details">
                     <h2 id="name-red">ChatGPT</h2>
                     <p class="model-sub" id="model-red">Model: GPT-4o</p>
+                    <div class="player-stats">
+                        <span class="stat-illegal" id="illegal-red">Sai luật: 0</span>
+                        <span id="latency-red">Nghĩ: 0.0s</span>
+                    </div>
                 </div>
                 
                 <!-- Speech Bubble -->
@@ -71,6 +76,10 @@
                 <div class="player-details">
                     <h2 id="name-black">Claude 3.5</h2>
                     <p class="model-sub" id="model-black">Model: Claude 3.5 Sonnet</p>
+                    <div class="player-stats">
+                        <span class="stat-illegal" id="illegal-black">Sai luật: 0</span>
+                        <span id="latency-black">Nghĩ: 0.0s</span>
+                    </div>
                 </div>
 
                 <!-- Speech Bubble -->
@@ -105,6 +114,16 @@
                 </div>
             </div>
         </footer>
+    </div>
+
+    <!-- Banner kết quả trận: thay cho alert() vì hộp thoại browser chặn việc ghi hình -->
+    <div id="result-overlay" class="result-overlay hidden">
+        <div class="result-card">
+            <div class="result-reason" id="result-reason">KẾT THÚC TRẬN ĐẤU</div>
+            <div class="result-winner" id="result-winner">—</div>
+            <div class="result-detail" id="result-detail"></div>
+            <button id="btn-close-result" class="btn btn-secondary">Đóng</button>
+        </div>
     </div>
 
     <!-- Configuration Modal / Sidebar -->

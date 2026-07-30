@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-toggle-panel').addEventListener('click', openModal);
     document.getElementById('btn-close-modal').addEventListener('click', closeModal);
     document.getElementById('btn-save-config').addEventListener('click', saveConfig);
+    document.getElementById('btn-close-result').addEventListener('click', hideResultBanner);
 });
 
 // Render SVG grid lines & river text
@@ -145,12 +146,12 @@ async function handleStep() {
 
         // TTS Speech synthesis if enabled
         if (data.last_move && document.getElementById('chk-tts').checked) {
-            speakReasoning(data.last_move.player, data.last_move.reasoning);
+            speakMove(data.last_move);
         }
 
         if (data.game_over) {
             stopAutoPlay();
-            alert(`KẾT THÚC TRẬN ĐẤU! ${data.winner} thắng!`);
+            showResultBanner(data);
         }
     } catch (e) {
         console.error("Step error:", e);
@@ -189,9 +190,26 @@ function scheduleNextStep() {
 
 async function handleReset() {
     stopAutoPlay();
+    hideResultBanner();
     const resp = await fetch('/api/reset', { method: 'POST' });
     const data = await resp.json();
     updateUI(data);
+}
+
+// Banner kết quả — thay alert() vì hộp thoại browser làm gián đoạn việc ghi hình
+function showResultBanner(state) {
+    const isDraw = state.result_status === 'draw';
+    document.getElementById('result-reason').textContent = state.result_text || 'KẾT THÚC TRẬN ĐẤU';
+    document.getElementById('result-winner').textContent = isDraw
+        ? 'HOÀ!'
+        : `${state.winner} THẮNG!`;
+    document.getElementById('result-detail').textContent =
+        `Tổng ${state.history_count} nước đi · Nước sai luật: Đỏ ${state.stats.red.illegal_attempts} - Đen ${state.stats.black.illegal_attempts}`;
+    document.getElementById('result-overlay').classList.remove('hidden');
+}
+
+function hideResultBanner() {
+    document.getElementById('result-overlay').classList.add('hidden');
 }
 
 function updateUI(state) {
@@ -213,12 +231,18 @@ function updateUI(state) {
 
     document.getElementById('move-counter').textContent = `Lượt: #${state.move_number}`;
 
+    // Cảnh báo chiếu tướng — kịch tính nhất trong cờ tướng, cần nổi bật khi quay video
+    document.getElementById('check-alert').classList.toggle('visible', !!state.in_check);
+
     // Player Cards
     document.getElementById('name-red').textContent = state.red_config.name;
     document.getElementById('model-red').textContent = `Provider: ${state.red_config.provider.toUpperCase()}`;
 
     document.getElementById('name-black').textContent = state.black_config.name;
     document.getElementById('model-black').textContent = `Provider: ${state.black_config.provider.toUpperCase()}`;
+
+    updatePlayerStats('red', state.stats.red);
+    updatePlayerStats('black', state.stats.black);
 
     // Referee text
     if (state.referee_log && state.referee_log.length > 0) {
@@ -236,6 +260,15 @@ function updateUI(state) {
 
     // Render Chess Pieces from FEN
     renderPiecesFromFEN(state.fen, state.last_move);
+}
+
+function updatePlayerStats(sideKey, stats) {
+    const illegalEl = document.getElementById(`illegal-${sideKey}`);
+    illegalEl.textContent = `Sai luật: ${stats.illegal_attempts}`;
+    illegalEl.classList.toggle('has-violation', stats.illegal_attempts > 0);
+
+    const avgSeconds = stats.moves > 0 ? (stats.total_latency_ms / stats.moves / 1000) : 0;
+    document.getElementById(`latency-${sideKey}`).textContent = `Nghĩ: ${avgSeconds.toFixed(1)}s`;
 }
 
 function renderPiecesFromFEN(fen, lastMove) {
@@ -295,11 +328,16 @@ function ucciToPos(ucci) {
     return { r: 9 - rank, c: col };
 }
 
-// Web Speech Synthesis (TTS)
-function speakReasoning(playerName, text) {
-    if (!synth || !text) return;
-    synth.cancel(); // stop previous speech
-    const utterance = new SpeechSynthesisUtterance(`${playerName} phát biểu: ${text}`);
+// Web Speech Synthesis (TTS) — đọc ký hiệu cờ tướng ("Pháo 2 bình 5") rồi tới lời bình
+function speakMove(lastMove) {
+    if (!synth) return;
+    const parts = [];
+    if (lastMove.vi_text) parts.push(lastMove.vi_text);
+    if (lastMove.reasoning) parts.push(lastMove.reasoning);
+    if (parts.length === 0) return;
+
+    synth.cancel(); // dừng câu trước để không đọc dồn khi chạy tốc độ nhanh
+    const utterance = new SpeechSynthesisUtterance(parts.join('. '));
     utterance.lang = 'vi-VN';
     utterance.rate = 1.0;
     synth.speak(utterance);

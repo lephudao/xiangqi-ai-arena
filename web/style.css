@@ -476,3 +476,80 @@ input:checked + .slider::before { transform: translateX(18px); }
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
 }
+
+/* ===== Cảnh báo chiếu tướng ===== */
+.check-alert {
+    display: none;
+    background: #dc2626;
+    color: #fff;
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 1px;
+    padding: 4px 12px;
+    border-radius: 6px;
+    animation: check-flash 0.7s ease-in-out infinite;
+}
+
+.check-alert.visible { display: inline-block; }
+
+@keyframes check-flash {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 rgba(220, 38, 38, 0.7); }
+    50% { opacity: 0.75; box-shadow: 0 0 18px rgba(220, 38, 38, 0.9); }
+}
+
+/* ===== Thống kê kỳ thủ (nước sai luật, thời gian nghĩ) ===== */
+.player-stats {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.player-stats .stat-illegal.has-violation {
+    color: #f87171;
+    font-weight: 700;
+}
+
+/* ===== Banner kết quả trận (thay cho alert() vốn chặn ghi hình) ===== */
+.result-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(2, 6, 23, 0.82);
+    z-index: 90;
+}
+
+.result-overlay.hidden { display: none; }
+
+.result-card {
+    text-align: center;
+    padding: 40px 64px;
+    border-radius: 20px;
+    background: linear-gradient(145deg, #1e293b, #0f172a);
+    border: 2px solid #f59e0b;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.7);
+}
+
+.result-card .result-reason {
+    font-size: 15px;
+    letter-spacing: 3px;
+    color: #fbbf24;
+    text-transform: uppercase;
+}
+
+.result-card .result-winner {
+    font-size: 40px;
+    font-weight: 800;
+    margin: 12px 0 6px;
+}
+
+.result-card .result-detail {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.result-card .btn { margin-top: 22px; }
