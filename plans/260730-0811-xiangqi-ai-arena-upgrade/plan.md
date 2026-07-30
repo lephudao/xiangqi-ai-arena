@@ -1,6 +1,6 @@
 # Xiangqi AI Arena — Nâng cấp thành "cuộc chiến AI thực thụ"
 
-**Status:** Phase 1 XONG · Phase 2 đang làm (Pikafish + chấm điểm XONG) | **Created:** 2026-07-30 | **Owner:** lephudao
+**Status:** Phase 1 XONG · Phase 2 gần xong (Pikafish + provider layer + prompt XONG; còn match_manager) | **Created:** 2026-07-30 | **Owner:** lephudao
 
 ## Mục tiêu
 
@@ -34,7 +34,7 @@ Biến hệ thống hiện tại (demo chạy được) thành đấu trường 
 - [x] Test suite luật cờ pass: check detection, chiếu bí, hết nước, lộ mặt tướng, hòa 60 nước, lặp 3 lần
 - [x] Chạy 1 trận mock 200 nước không sinh nước sai luật, không treo, kết thúc đúng trạng thái
 - [x] Pikafish chấm được mọi nước; UI hiện eval bar + nhãn chất lượng (Hay/Sai/Blunder)
-- [ ] 5+ provider hoạt động: OpenAI, Gemini, Anthropic, Grok, DeepSeek (+ Pikafish làm player boss)
+- [x] 5+ provider hoạt động: OpenAI, Gemini, Anthropic, Grok, DeepSeek (+ Pikafish làm player boss)
 - [x] Nước sai luật của AI được **đếm và log**, không bị âm thầm thay bằng random
 - [ ] Trận lưu vào SQLite; replay lại được từ DB không gọi API
 - [ ] `scripts/run-tournament.py` chạy round-robin không cần bấm nút

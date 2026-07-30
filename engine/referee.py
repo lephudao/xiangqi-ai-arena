@@ -6,8 +6,9 @@ tối đa MAX_MOVE_ATTEMPTS lần kèm lý do cụ thể, đếm số lần sai,
 hoàn toàn không đưa được nước hợp lệ.
 """
 
-from engine.ai_agent import AIAgent
 from engine.analysis import PikafishEngine, average_accuracy, score_move
+from engine.prompt_builder import build_move_prompt
+from engine.providers import create_provider
 from engine.xiangqi import STATUS_DRAW, STATUS_ONGOING, XiangqiBoard
 
 MAX_MOVE_ATTEMPTS = 3
@@ -20,8 +21,8 @@ BLUNDER_COMMENT_THRESHOLD = 500
 # (tắt chấm điểm cần cho test và cho chế độ chạy giải đấu nhanh).
 AUTO_ANALYSIS_ENGINE = object()
 
-DEFAULT_RED_CONFIG = {"name": "ChatGPT (Đỏ)", "provider": "mock", "model": "mock-red"}
-DEFAULT_BLACK_CONFIG = {"name": "Claude (Đen)", "provider": "mock", "model": "mock-black"}
+DEFAULT_RED_CONFIG = {"name": "Kỳ thủ Đỏ", "model_key": "mock"}
+DEFAULT_BLACK_CONFIG = {"name": "Kỳ thủ Đen", "model_key": "mock"}
 
 RESULT_MESSAGES_VI = {
     "checkmate": "CHIẾU BÍ",
@@ -43,6 +44,10 @@ def _new_player_stats():
         "mistakes": 0,
         "best_moves": 0,
         "accuracy": None,   # None khi chưa chấm được nước nào (thiếu engine)
+        "tokens_in": 0,
+        "tokens_out": 0,
+        "cost_usd": 0.0,
+        "cost_known": True,  # False khi có model chưa có bảng giá
     }
 
 
@@ -61,14 +66,22 @@ class MatchReferee:
         )
 
     def _build_agent(self, config):
-        return AIAgent(
-            provider=config.get("provider", "mock"),
-            model_name=config.get("model", ""),
-            api_key=config.get("api_key", ""),
+        """Tạo kỳ thủ từ cấu hình; ghi log nếu phải thay thế (ví dụ thiếu API key)."""
+        provider, note = create_provider(
+            config.get("model_key", "mock"),
+            api_key=config.get("api_key"),
+            effort=config.get("effort"),
+            analysis_engine=self.analysis_engine,
         )
+        if note:
+            self._pending_notes.append(f"Trọng tài: {config.get('name', '?')} — {note}")
+        return provider
 
     def _start_new_game(self, opening_message):
         self.board = XiangqiBoard()
+        # Ghi chú phát sinh khi tạo kỳ thủ (thiếu API key, model không tồn tại...) —
+        # thu ở đây rồi đưa vào log mở đầu để người xem biết ai là AI thật, ai là Mock.
+        self._pending_notes = []
         self.red_agent = self._build_agent(self.red_config)
         self.black_agent = self._build_agent(self.black_config)
 
@@ -81,7 +94,7 @@ class MatchReferee:
         self.stats = {'w': _new_player_stats(), 'b': _new_player_stats()}
         self.evaluations = {'w': [], 'b': []}   # MoveEvaluation theo từng bên
         self.current_cp = 0                     # điểm thế cờ theo góc nhìn Đỏ, cho eval bar
-        self.referee_log = [opening_message]
+        self.referee_log = [opening_message] + self._pending_notes
 
     def reset(self, red_config=None, black_config=None):
         if red_config:
@@ -154,7 +167,11 @@ class MatchReferee:
             "player": self._player_name(side),
             "ucci": chosen_move,
             "vi_text": vi_notation,
-            "reasoning": decision.reasoning,
+            "reasoning": decision.taunt,      # câu thoại cho khán giả (TTS đọc câu này)
+            "thinking": decision.thinking,    # phân tích thật, hiện ở log chứ không đọc TTS
+            "model_key": decision.model_key,
+            "tokens": {"in": decision.tokens_in, "out": decision.tokens_out},
+            "cost_usd": decision.cost_usd,
             "attempts": attempts,
             "referee_override": referee_override,
             "latency_ms": decision.latency_ms,
@@ -189,17 +206,19 @@ class MatchReferee:
         Xin nước đi, cho đi lại kèm lý do khi sai. Trả (decision cuối, danh sách nước đã thử).
         """
         agent = self._agent(side)
-        fen = self.board.to_fen()
-        in_check = self.board.is_in_check(side)
         attempts = []
         feedback = None
         decision = None
 
         for attempt_index in range(MAX_MOVE_ATTEMPTS):
-            decision = agent.get_move(
-                fen, legal_moves, self._player_name(side), side,
-                feedback=feedback, in_check=in_check,
+            # Prompt dựng lại mỗi lần thử để kèm được lý do nước trước bị từ chối.
+            # Cùng một template cho mọi provider — điều kiện cần để so sánh công bằng.
+            prompt = build_move_prompt(
+                self.board, side, legal_moves, self._player_name(side),
+                move_logs=self.move_logs, feedback=feedback,
             )
+            decision = agent.decide(prompt, legal_moves, board=self.board, side=side)
+            self._record_usage(side, decision)
 
             if decision.error:
                 self.stats[side]["api_errors"] += 1
@@ -225,6 +244,19 @@ class MatchReferee:
         decision.attempts = attempts
         return decision, attempts
 
+    def _record_usage(self, side, decision):
+        """
+        Cộng token và chi phí. Mỗi LẦN THỬ đều tính tiền, kể cả lần đi sai luật — nếu chỉ
+        tính lần thành công thì chi phí báo ra sẽ thấp hơn hoá đơn thật.
+        """
+        stats = self.stats[side]
+        stats["tokens_in"] += decision.tokens_in
+        stats["tokens_out"] += decision.tokens_out
+        if decision.cost_usd is None:
+            stats["cost_known"] = False   # model chưa có bảng giá -> không báo số sai
+        else:
+            stats["cost_usd"] = round(stats["cost_usd"] + decision.cost_usd, 6)
+
     def _record_evaluation(self, side, evaluation):
         """Cập nhật thống kê chất lượng nước đi và điểm thế cờ cho eval bar."""
         if evaluation is None:
@@ -244,6 +276,12 @@ class MatchReferee:
 
         # Eval bar luôn hiển thị theo góc nhìn Đỏ để người xem không bị lẫn
         self.current_cp = evaluation.cp_after if side == 'w' else -evaluation.cp_after
+
+    def _total_cost(self):
+        """Chi phí cả trận. None nếu có kỳ thủ dùng model chưa có bảng giá."""
+        if not all(self.stats[side]["cost_known"] for side in ('w', 'b')):
+            return None
+        return round(self.stats['w']["cost_usd"] + self.stats['b']["cost_usd"], 4)
 
     def _finish(self, result):
         self.game_over = True
@@ -283,6 +321,7 @@ class MatchReferee:
             "referee_log": self.referee_log[-5:],
             # Dữ liệu chấm điểm: eval bar + trạng thái engine
             "eval_cp": self.current_cp,
+            "cost_total_usd": self._total_cost(),
             "analysis_enabled": self.analysis_engine is not None and self.analysis_engine.is_available,
             "analysis_note": getattr(self.analysis_engine, "unavailable_reason", None),
         }

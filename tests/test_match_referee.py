@@ -4,7 +4,7 @@ Test trọng tài & vòng đời trận đấu, bao gồm smoke test một trậ
 
 import random
 
-from engine.ai_agent import MoveDecision
+from engine.providers import MoveDecision
 from engine.referee import MatchReferee
 from engine.xiangqi import STATUS_DRAW, STATUS_ONGOING
 
@@ -12,8 +12,8 @@ from engine.xiangqi import STATUS_DRAW, STATUS_ONGOING
 def _mock_referee():
     """Trọng tài dùng mock AI và TẮT chấm điểm engine để test chạy nhanh."""
     return MatchReferee(
-        {"name": "AI Đỏ", "provider": "mock", "model": "mock"},
-        {"name": "AI Đen", "provider": "mock", "model": "mock"},
+        {"name": "AI Đỏ", "model_key": "mock"},
+        {"name": "AI Đen", "model_key": "mock"},
         analysis_engine=None,
     )
 
@@ -61,18 +61,19 @@ def test_illegal_ai_move_is_counted_and_retried(monkeypatch):
     referee = _mock_referee()
     call_log = []
 
-    def fake_get_move(fen, legal_moves, side_name, side_code, feedback=None, in_check=False):
-        call_log.append(feedback)
+    def fake_decide(prompt, legal_moves, board=None, side=None):
+        # Prompt lần 2 phải chứa lý do bị từ chối -> kiểm tra qua nội dung prompt
+        call_log.append(prompt)
         if len(call_log) == 1:
-            return MoveDecision(move_ucci="a0a9", reasoning="nước sai luật")  # Xe xuyên quân
-        return MoveDecision(move_ucci=legal_moves[0], reasoning="đi lại đúng luật")
+            return MoveDecision(move_ucci="a0a9", taunt="nước sai luật")  # Xe xuyên quân
+        return MoveDecision(move_ucci=legal_moves[0], taunt="đi lại đúng luật")
 
-    monkeypatch.setattr(referee.red_agent, "get_move", fake_get_move)
+    monkeypatch.setattr(referee.red_agent, "decide", fake_decide)
     referee.step()
 
     assert referee.stats['w']["illegal_attempts"] == 1
     assert len(call_log) == 2
-    assert call_log[1] is not None, "lần thử thứ 2 phải nhận được lý do bị từ chối"
+    assert "BỊ TRỌNG TÀI TỪ CHỐI" in call_log[1], "prompt lần 2 phải kèm lý do bị từ chối"
     assert referee.last_move["referee_override"] is None
     assert referee.last_move["attempts"] == ["a0a9", referee.last_move["ucci"]]
 
@@ -80,10 +81,10 @@ def test_illegal_ai_move_is_counted_and_retried(monkeypatch):
 def test_referee_picks_move_when_ai_keeps_failing(monkeypatch):
     referee = _mock_referee()
 
-    def always_illegal(fen, legal_moves, side_name, side_code, feedback=None, in_check=False):
-        return MoveDecision(move_ucci="zzzz", reasoning="cố tình sai")
+    def always_illegal(prompt, legal_moves, board=None, side=None):
+        return MoveDecision(move_ucci="zzzz", taunt="cố tình sai")
 
-    monkeypatch.setattr(referee.red_agent, "get_move", always_illegal)
+    monkeypatch.setattr(referee.red_agent, "decide", always_illegal)
     referee.step()
 
     assert referee.stats['w']["illegal_attempts"] == 3
@@ -94,10 +95,10 @@ def test_referee_picks_move_when_ai_keeps_failing(monkeypatch):
 def test_api_error_is_recorded_not_hidden(monkeypatch):
     referee = _mock_referee()
 
-    def failing_call(fen, legal_moves, side_name, side_code, feedback=None, in_check=False):
+    def failing_call(prompt, legal_moves, board=None, side=None):
         return MoveDecision(error="TimeoutError: mạng lỗi")
 
-    monkeypatch.setattr(referee.red_agent, "get_move", failing_call)
+    monkeypatch.setattr(referee.red_agent, "decide", failing_call)
     referee.step()
 
     assert referee.stats['w']["api_errors"] == 1

@@ -12,7 +12,10 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
-load_dotenv()  # nạp API key và cấu hình từ .env trước khi đọc os.environ
+# Nạp cấu hình trước khi đọc os.environ. .env.local ghi đè .env để giữ key thật
+# ngoài file mẫu được commit.
+load_dotenv(".env")
+load_dotenv(".env.local", override=True)
 
 from engine.referee import MatchReferee  # noqa: E402 — phải import sau load_dotenv
 

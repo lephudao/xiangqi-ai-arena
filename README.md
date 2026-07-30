@@ -17,11 +17,15 @@ Không cần API key: mặc định cả hai bên chạy chế độ **Mock** (c
 
 ## Cấu hình
 
-Copy `.env.example` → `.env`:
+Copy `.env.example` → `.env.local` (file này đã được gitignore, an toàn để chứa key thật):
 
 | Biến | Mặc định | Ý nghĩa |
 |------|----------|---------|
-| `GEMINI_API_KEY` / `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | rỗng | Không có key → tự động dùng Mock |
+| `ANTHROPIC_API_KEY` | rỗng | Cho Claude. Không có key → tự động dùng Mock và ghi rõ lý do vào log |
+| `GEMINI_API_KEY` | rỗng | Cho Gemini |
+| `OPENAI_API_KEY` / `XAI_API_KEY` / `DEEPSEEK_API_KEY` | rỗng | ChatGPT / Grok / DeepSeek (code đã viết, **chưa kiểm chứng** bằng key thật) |
+| `PIKAFISH_PATH` | engine/bin/pikafish | Engine chấm điểm; cài bằng `./scripts/install-pikafish.sh` |
+| `PIKAFISH_MOVETIME_MS` | 300 | Thời gian engine phân tích mỗi thế cờ |
 | `PORT` | 5000 | Cổng server |
 | `HOST` | 127.0.0.1 | Chỉ nghe local. **Chỉ mở ra ngoài sau khi đã thêm xác thực** |
 | `FLASK_DEBUG` | 0 | Bật debugger Werkzeug (nguy hiểm nếu mở ra mạng ngoài) |
@@ -35,7 +39,10 @@ API key cũng có thể nhập trực tiếp trong hộp thoại ⚙️ Cấu H�
 server.py                 Flask API + phục vụ file tĩnh
 engine/
   referee.py              Trọng tài: phân lượt, xác thực nước đi, đếm vi phạm, kết luận trận
-  ai_agent.py             Gọi API LLM (Gemini/OpenAI/Anthropic) + chế độ Mock
+  model_registry.py       Danh mục model + bảng giá token (một chỗ duy nhất để cập nhật)
+  prompt_builder.py       Dựng prompt: bàn cờ ASCII, lịch sử, kiểm kê quân, cảnh báo chiếu
+  providers/              Kỳ thủ: Claude (SDK), Gemini (SDK), OpenAI-compatible, Mock, Pikafish
+  analysis/               Pikafish chấm điểm: centipawn loss, nhãn chất lượng, accuracy %
   xiangqi/
     board.py              Trạng thái bàn cờ, FEN, thực hiện nước đi, bộ đếm luật hoà
     move_generation.py    Sinh nước đi 7 loại quân + lọc nước hợp lệ
@@ -55,6 +62,9 @@ plans/                    Kế hoạch nâng cấp theo phase
   Mọi lần sai đều được **đếm và hiển thị** — đây là một thước đo sức mạnh.
 - Chỉ khi AI không đưa được nước hợp lệ sau cả 3 lần, trọng tài mới chọn thay và ghi rõ vào log.
 - Cùng một template prompt cho mọi nhà cung cấp; chỉ khác cách gói request theo từng API.
+- Nước đi trả về là **string tự do**, không dùng enum giới hạn danh sách. Ép enum sẽ khiến
+  mọi AI đi hợp lệ 100% và mất tín hiệu "AI có thật sự đọc được bàn cờ không".
+- Pikafish chỉ **chấm điểm sau khi AI đã quyết định**, không gợi ý nước đi cho AI.
 - Đỏ đi trước nên có lợi thế → khi chạy giải đấu phải cho mỗi cặp đánh cả hai màu.
 
 ## Luật cờ đã cài đặt
@@ -80,5 +90,5 @@ Mốc kiểm chứng chính: thế khai cuộc có đúng **44 nước đi hợp
 Xem [plans/260730-0811-xiangqi-ai-arena-upgrade/plan.md](plans/260730-0811-xiangqi-ai-arena-upgrade/plan.md):
 
 - **Phase 1** (xong) — sửa tính đúng đắn luật cờ + an toàn vận hành
-- **Phase 2** — Pikafish chấm điểm từng nước (accuracy %, blunder), thêm Grok/DeepSeek, prompt nghiêm túc
+- **Phase 2** (gần xong) — Pikafish chấm điểm ✅, provider layer ✅, prompt nghiêm túc ✅; còn match_manager
 - **Phase 3** — lưu trận vào SQLite, replay không tốn API, giải đấu headless, Elo, overlay OBS
