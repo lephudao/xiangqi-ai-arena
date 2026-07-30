@@ -54,6 +54,17 @@ def reset_match():
     return jsonify(match.get_state())
 
 
+@app.route("/api/models", methods=["GET"])
+def get_models():
+    """Danh mục kỳ thủ cho dropdown — UI không hardcode model nữa."""
+    from engine.model_registry import DEFAULT_BLACK_MODEL, DEFAULT_RED_MODEL, list_models
+    return jsonify({
+        "models": list_models(),
+        "default_red": DEFAULT_RED_MODEL,
+        "default_black": DEFAULT_BLACK_MODEL,
+    })
+
+
 @app.route("/api/history", methods=["GET"])
 def get_history():
     """Toàn bộ nước đi + nhật ký trọng tài của trận hiện tại (dùng để dựng video)."""

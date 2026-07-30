@@ -38,8 +38,8 @@
                     <div class="player-tag">🔴 ĐỎ (TIÊN HẠ)</div>
                 </div>
                 <div class="player-details">
-                    <h2 id="name-red">ChatGPT</h2>
-                    <p class="model-sub" id="model-red">Model: GPT-4o</p>
+                    <h2 id="name-red">Kỳ thủ Đỏ</h2>
+                    <p class="model-sub" id="model-red">—</p>
                     <div class="player-stats">
                         <span class="stat-illegal" id="illegal-red">Sai luật: 0</span>
                         <span id="latency-red">Nghĩ: 0.0s</span>
@@ -86,8 +86,8 @@
                     <div class="player-tag">🟢 ĐEN (HẬU THỦ)</div>
                 </div>
                 <div class="player-details">
-                    <h2 id="name-black">Claude 3.5</h2>
-                    <p class="model-sub" id="model-black">Model: Claude 3.5 Sonnet</p>
+                    <h2 id="name-black">Kỳ thủ Đen</h2>
+                    <p class="model-sub" id="model-black">—</p>
                     <div class="player-stats">
                         <span class="stat-illegal" id="illegal-black">Sai luật: 0</span>
                         <span id="latency-black">Nghĩ: 0.0s</span>
@@ -153,19 +153,22 @@
                     <legend>🔴 Kỳ Thủ Đỏ (Red Side)</legend>
                     <div class="form-group">
                         <label>Tên Kỳ Thủ:</label>
-                        <input type="text" id="cfg-red-name" value="ChatGPT">
+                        <input type="text" id="cfg-red-name" placeholder="Bỏ trống để lấy tên model">
                     </div>
                     <div class="form-group">
-                        <label>Nhà Cung Cấp (Provider):</label>
-                        <select id="cfg-red-provider">
-                            <option value="mock" selected>Giả Lập (Mock - Không cần API Key)</option>
-                            <option value="openai">OpenAI (ChatGPT)</option>
-                            <option value="gemini">Google Gemini</option>
-                            <option value="anthropic">Anthropic (Claude)</option>
+                        <label>Kỳ Thủ (Model):</label>
+                        <select id="cfg-red-model"><!-- nạp từ /api/models --></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Độ sâu suy nghĩ (chỉ áp dụng cho Claude):</label>
+                        <select id="cfg-red-effort">
+                            <option value="low" selected>Thấp — nhanh, tiết kiệm</option>
+                            <option value="medium">Trung bình</option>
+                            <option value="high">Cao — nghĩ sâu, tốn nhiều token</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>API Key (Tùy chọn nếu chọn API):</label>
+                        <label>API Key (bỏ trống nếu đã đặt trong .env.local):</label>
                         <input type="password" id="cfg-red-key" placeholder="Dán OpenAI / Gemini API Key tại đây">
                     </div>
                 </fieldset>
@@ -175,19 +178,22 @@
                     <legend>🟢 Kỳ Thủ Đen (Black Side)</legend>
                     <div class="form-group">
                         <label>Tên Kỳ Thủ:</label>
-                        <input type="text" id="cfg-black-name" value="Claude 3.5">
+                        <input type="text" id="cfg-black-name" placeholder="Bỏ trống để lấy tên model">
                     </div>
                     <div class="form-group">
-                        <label>Nhà Cung Cấp (Provider):</label>
-                        <select id="cfg-black-provider">
-                            <option value="mock" selected>Giả Lập (Mock - Không cần API Key)</option>
-                            <option value="openai">OpenAI (ChatGPT)</option>
-                            <option value="gemini">Google Gemini</option>
-                            <option value="anthropic">Anthropic (Claude)</option>
+                        <label>Kỳ Thủ (Model):</label>
+                        <select id="cfg-black-model"><!-- nạp từ /api/models --></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Độ sâu suy nghĩ (chỉ áp dụng cho Claude):</label>
+                        <select id="cfg-black-effort">
+                            <option value="low" selected>Thấp — nhanh, tiết kiệm</option>
+                            <option value="medium">Trung bình</option>
+                            <option value="high">Cao — nghĩ sâu, tốn nhiều token</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>API Key (Tùy chọn nếu chọn API):</label>
+                        <label>API Key (bỏ trống nếu đã đặt trong .env.local):</label>
                         <input type="password" id="cfg-black-key" placeholder="Dán Anthropic / Gemini API Key tại đây">
                     </div>
                 </fieldset>

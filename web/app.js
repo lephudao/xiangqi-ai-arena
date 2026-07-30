@@ -6,6 +6,7 @@ let currentState = null;
 let isAutoPlaying = false;
 let autoPlayTimer = null;
 let synth = window.speechSynthesis;
+let availableModels = [];
 
 // Xiangqi Chinese Character Mapping
 const PIECE_SYMBOLS_VI = {
@@ -13,8 +14,9 @@ const PIECE_SYMBOLS_VI = {
     'k': '將', 'r': '車', 'n': '馬', 'b': '象', 'a': '士', 'c': '砲', 'p': '卒'
 };
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     initBoardSVG();
+    await loadModels();
     fetchState();
 
     // Event Listeners
@@ -127,6 +129,32 @@ function drawX(svg, svgNS, x1, y1, x2, y2) {
     svg.appendChild(l2);
 }
 
+// Nạp danh mục kỳ thủ và dựng dropdown — tránh hardcode model trong HTML
+async function loadModels() {
+    try {
+        const resp = await fetch('/api/models');
+        const data = await resp.json();
+        availableModels = data.models;
+        fillModelSelect('cfg-red-model', data.default_red);
+        fillModelSelect('cfg-black-model', data.default_black);
+    } catch (e) {
+        console.error('Không nạp được danh mục model:', e);
+    }
+}
+
+function fillModelSelect(elementId, defaultKey) {
+    const select = document.getElementById(elementId);
+    select.innerHTML = '';
+    availableModels.forEach(model => {
+        const option = document.createElement('option');
+        option.value = model.key;
+        // Đánh dấu rõ model chưa kiểm chứng để không hứa suông với người dùng
+        option.textContent = model.verified ? model.label : `${model.label} (chưa kiểm chứng)`;
+        select.appendChild(option);
+    });
+    select.value = defaultKey;
+}
+
 async function fetchState() {
     try {
         const resp = await fetch('/api/state');
@@ -236,10 +264,10 @@ function updateUI(state) {
 
     // Player Cards
     document.getElementById('name-red').textContent = state.red_config.name;
-    document.getElementById('model-red').textContent = `Provider: ${state.red_config.provider.toUpperCase()}`;
+    document.getElementById('model-red').textContent = describeConfig(state.red_config);
 
     document.getElementById('name-black').textContent = state.black_config.name;
-    document.getElementById('model-black').textContent = `Provider: ${state.black_config.provider.toUpperCase()}`;
+    document.getElementById('model-black').textContent = describeConfig(state.black_config);
 
     updatePlayerStats('red', state.stats.red);
     updatePlayerStats('black', state.stats.black);
@@ -263,6 +291,14 @@ function updateUI(state) {
 
     // Render Chess Pieces from FEN
     renderPiecesFromFEN(state.fen, state.last_move);
+}
+
+// Nhãn model dưới tên kỳ thủ; lấy từ danh mục nạp qua /api/models
+function describeConfig(config) {
+    const model = availableModels.find(m => m.key === config.model_key);
+    if (!model) return config.model_key || 'Mock';
+    const effort = config.effort ? ` · effort ${config.effort}` : '';
+    return `${model.label}${effort}`;
 }
 
 function updatePlayerStats(sideKey, stats) {
@@ -425,16 +461,19 @@ function closeModal() {
 }
 
 async function saveConfig() {
-    const redConfig = {
-        name: document.getElementById('cfg-red-name').value || "ChatGPT",
-        provider: document.getElementById('cfg-red-provider').value,
-        api_key: document.getElementById('cfg-red-key').value
+    const buildConfig = (sideKey, fallbackName) => {
+        const modelKey = document.getElementById(`cfg-${sideKey}-model`).value;
+        const model = availableModels.find(m => m.key === modelKey);
+        return {
+            // Bỏ trống tên -> lấy tên model để overlay luôn hiển thị đúng kỳ thủ
+            name: document.getElementById(`cfg-${sideKey}-name`).value || (model ? model.label : fallbackName),
+            model_key: modelKey,
+            effort: document.getElementById(`cfg-${sideKey}-effort`).value || undefined,
+            api_key: document.getElementById(`cfg-${sideKey}-key`).value || undefined
+        };
     };
-    const blackConfig = {
-        name: document.getElementById('cfg-black-name').value || "Claude 3.5",
-        provider: document.getElementById('cfg-black-provider').value,
-        api_key: document.getElementById('cfg-black-key').value
-    };
+    const redConfig = buildConfig('red', 'Kỳ thủ Đỏ');
+    const blackConfig = buildConfig('black', 'Kỳ thủ Đen');
 
     closeModal();
 

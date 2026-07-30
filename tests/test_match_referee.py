@@ -173,3 +173,23 @@ def test_accuracy_is_average_over_scored_moves():
     for accuracy in (100.0, 50.0):
         referee._record_evaluation('w', MoveEvaluation(accuracy=accuracy, quality="good"))
     assert referee.stats['w']["accuracy"] == 75.0
+
+
+def test_config_without_name_uses_model_label():
+    """Client chỉ gửi model_key -> tên hiển thị tự lấy từ danh mục, không được KeyError."""
+    from engine.referee import normalize_config
+
+    config = normalize_config({"model_key": "claude-opus-5"}, "dự phòng")
+    assert config["name"] == "Claude Opus 5"
+
+    # model không có trong danh mục -> dùng tên dự phòng
+    assert normalize_config({"model_key": "la-lung"}, "dự phòng")["name"] == "dự phòng"
+    # config rỗng -> mặc định Mock
+    assert normalize_config(None, "dự phòng")["model_key"] == "mock"
+
+
+def test_referee_accepts_config_without_name():
+    referee = MatchReferee({"model_key": "mock"}, {"model_key": "mock"}, analysis_engine=None)
+    state = referee.step()
+    assert state["red_config"]["name"]
+    assert state["last_move"]["player"]

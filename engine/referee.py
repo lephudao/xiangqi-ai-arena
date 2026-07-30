@@ -24,6 +24,23 @@ AUTO_ANALYSIS_ENGINE = object()
 DEFAULT_RED_CONFIG = {"name": "Kỳ thủ Đỏ", "model_key": "mock"}
 DEFAULT_BLACK_CONFIG = {"name": "Kỳ thủ Đen", "model_key": "mock"}
 
+
+def normalize_config(config, fallback_name):
+    """
+    Điền các trường thiếu trong cấu hình kỳ thủ.
+
+    Client chỉ cần gửi model_key; tên hiển thị tự lấy từ nhãn model trong danh mục để
+    API không vỡ khi thiếu trường (trước đây thiếu "name" là KeyError làm sập /api/reset).
+    """
+    from engine.model_registry import get_model
+
+    config = dict(config or {})
+    config.setdefault("model_key", "mock")
+    if not config.get("name"):
+        model = get_model(config["model_key"])
+        config["name"] = model.label if model else fallback_name
+    return config
+
 RESULT_MESSAGES_VI = {
     "checkmate": "CHIẾU BÍ",
     "stalemate": "HẾT NƯỚC ĐI (bị vây chết)",
@@ -53,8 +70,8 @@ def _new_player_stats():
 
 class MatchReferee:
     def __init__(self, red_config=None, black_config=None, analysis_engine=AUTO_ANALYSIS_ENGINE):
-        self.red_config = red_config or dict(DEFAULT_RED_CONFIG)
-        self.black_config = black_config or dict(DEFAULT_BLACK_CONFIG)
+        self.red_config = normalize_config(red_config or DEFAULT_RED_CONFIG, "Kỳ thủ Đỏ")
+        self.black_config = normalize_config(black_config or DEFAULT_BLACK_CONFIG, "Kỳ thủ Đen")
         # Engine chấm điểm dùng chung cho cả trận. Thiếu engine -> chỉ mất phần chấm điểm,
         # trận vẫn chạy bình thường.
         self.analysis_engine = (
@@ -98,9 +115,9 @@ class MatchReferee:
 
     def reset(self, red_config=None, black_config=None):
         if red_config:
-            self.red_config = red_config
+            self.red_config = normalize_config(red_config, "Kỳ thủ Đỏ")
         if black_config:
-            self.black_config = black_config
+            self.black_config = normalize_config(black_config, "Kỳ thủ Đen")
         self._start_new_game("Trọng tài: Trận mới BẮT ĐẦU!")
 
     # --- Thông tin bên đang đi ---
