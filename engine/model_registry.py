@@ -92,7 +92,8 @@ ALL_MODELS = _ANTHROPIC + _GEMINI + _OPENAI_COMPATIBLE + _BASELINES
 _BY_KEY = {model.key: model for model in ALL_MODELS}
 
 DEFAULT_RED_MODEL = "claude-haiku-4-5"
-DEFAULT_BLACK_MODEL = "gemini-3.1-pro"
+# Flash cùng phân khúc giá/tốc độ với Haiku 4.5 -> cặp đấu công bằng
+DEFAULT_BLACK_MODEL = "gemini-3.6-flash"
 
 
 def get_model(key):

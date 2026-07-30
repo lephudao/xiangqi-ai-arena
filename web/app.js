@@ -82,6 +82,12 @@ async function handleStep() {
         if (data.game_over) {
             stopAutoPlay();
             showResultBanner(data);
+        } else if (isAutoPlaying && exceedsBudget(data)) {
+            stopAutoPlay();
+            document.getElementById('referee-text').textContent =
+                `Đã tự dừng: chi phí trận đạt ${formatUsd(data.cost_total_usd)}, `
+                + `chạm ngân sách ${formatUsd(budgetLimit())}. `
+                + `Nâng ngân sách rồi bấm Tự Động Đấu để tiếp.`;
         }
     } catch (e) {
         console.error("Step error:", e);
@@ -112,6 +118,11 @@ function showThinking(playerName) {
 function hideThinking() {
     clearInterval(thinkingTimer);
     document.getElementById('thinking-overlay').classList.remove('visible');
+}
+
+// Chỉ chặn được khi biết chi phí; model chưa niêm yết giá thì cost_total_usd là null
+function exceedsBudget(state) {
+    return typeof state.cost_total_usd === 'number' && state.cost_total_usd >= budgetLimit();
 }
 
 function toggleAutoPlay() {
@@ -200,6 +211,7 @@ function updateUI(state) {
     updatePlayerStats('red', state.stats.red);
     updatePlayerStats('black', state.stats.black);
     updateEvalBar(state.eval_cp);
+    updateCostMeter(state);
     updateQualityBadge(state.last_move);
     updateAnalysisWarning(state);
 
@@ -227,6 +239,31 @@ function describeConfig(config) {
     if (!model) return config.model_key || 'mock';
     const effort = config.effort && model.provider === 'anthropic' ? ` · effort ${config.effort}` : '';
     return `${model.provider} · ${model.model_id}${effort}`;
+}
+
+// Bộ đếm chi phí. cost_total_usd = null khi có kỳ thủ dùng model chưa niêm yết giá —
+// khi đó hiện "—" thay vì con số sai, và ngân sách tự dừng không thể áp dụng.
+function updateCostMeter(state) {
+    const element = document.getElementById('cost-value');
+    const cost = state.cost_total_usd;
+    if (cost === null || cost === undefined) {
+        element.textContent = '—';
+        element.classList.remove('over-budget');
+        return;
+    }
+    element.textContent = `$${cost.toFixed(4)}`;
+    element.classList.toggle('over-budget', cost >= budgetLimit() * 0.8);
+}
+
+// Số tiền nhỏ hơn 1 xu vẫn phải đọc được: toFixed(2) sẽ biến $0.003 thành "$0.00"
+function formatUsd(value) {
+    if (!Number.isFinite(value)) return '∞';
+    return value < 0.01 ? `$${value.toFixed(4)}` : `$${value.toFixed(2)}`;
+}
+
+function budgetLimit() {
+    const value = parseFloat(document.getElementById('inp-budget').value);
+    return Number.isFinite(value) && value > 0 ? value : Infinity;
 }
 
 function updatePlayerStats(sideKey, stats) {
