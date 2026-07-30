@@ -30,11 +30,11 @@ Biến hệ thống hiện tại (demo chạy được) thành đấu trường 
 
 ## Acceptance criteria toàn plan
 
-- [ ] Test suite luật cờ pass: check detection, chiếu bí, hết nước, lộ mặt tướng, hòa 60 nước, lặp 3 lần
-- [ ] Chạy 1 trận mock 200 nước không sinh nước sai luật, không treo, kết thúc đúng trạng thái
+- [x] Test suite luật cờ pass: check detection, chiếu bí, hết nước, lộ mặt tướng, hòa 60 nước, lặp 3 lần
+- [x] Chạy 1 trận mock 200 nước không sinh nước sai luật, không treo, kết thúc đúng trạng thái
 - [ ] Pikafish chấm được mọi nước; UI hiện eval bar + nhãn chất lượng (Hay/Sai/Blunder)
 - [ ] 5+ provider hoạt động: OpenAI, Gemini, Anthropic, Grok, DeepSeek (+ Pikafish làm player boss)
-- [ ] Nước sai luật của AI được **đếm và log**, không bị âm thầm thay bằng random
+- [x] Nước sai luật của AI được **đếm và log**, không bị âm thầm thay bằng random
 - [ ] Trận lưu vào SQLite; replay lại được từ DB không gọi API
 - [ ] `scripts/run-tournament.py` chạy round-robin không cần bấm nút
 - [ ] Elo leaderboard cập nhật sau mỗi trận
