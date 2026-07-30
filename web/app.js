@@ -1,6 +1,9 @@
 /**
- * Xiangqi AI vs AI Broadcast Studio Logic
+ * Điều khiển studio phát sóng AI vs AI: gọi API, cập nhật giao diện, TTS.
+ * Phần vẽ bàn cờ nằm ở js/board-renderer.js.
  */
+
+import { renderBoardGrid, renderPieces } from './js/board-renderer.js';
 
 let currentState = null;
 let isAutoPlaying = false;
@@ -8,14 +11,8 @@ let autoPlayTimer = null;
 let synth = window.speechSynthesis;
 let availableModels = [];
 
-// Xiangqi Chinese Character Mapping
-const PIECE_SYMBOLS_VI = {
-    'K': '帥', 'R': '俥', 'N': '傌', 'B': '相', 'A': '仕', 'C': '炮', 'P': '兵',
-    'k': '將', 'r': '車', 'n': '馬', 'b': '象', 'a': '士', 'c': '砲', 'p': '卒'
-};
-
 document.addEventListener('DOMContentLoaded', async () => {
-    initBoardSVG();
+    renderBoardGrid(document.getElementById('board'));
     await loadModels();
     fetchState();
 
@@ -28,106 +25,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-save-config').addEventListener('click', saveConfig);
     document.getElementById('btn-close-result').addEventListener('click', hideResultBanner);
 });
-
-// Render SVG grid lines & river text
-function initBoardSVG() {
-    const boardEl = document.getElementById('board');
-    boardEl.innerHTML = ''; // clear
-
-    const svgNS = "http://www.w3.org/2000/svg";
-    const svg = document.createElementNS(svgNS, "svg");
-    svg.setAttribute("class", "board-grid-svg");
-    svg.setAttribute("viewBox", "0 0 480 533");
-
-    // Board parameters: 9 cols, 10 rows
-    // Col width = 480 / 8 = 60px
-    // Row height = 533 / 9 = 59.2px
-    const colW = 480 / 8;
-    const rowH = 533 / 9;
-
-    // Draw Grid Lines
-    // Ranks (Horizontal)
-    for (let r = 0; r < 10; r++) {
-        const line = document.createElementNS(svgNS, "line");
-        line.setAttribute("x1", 24);
-        line.setAttribute("y1", 26 + r * rowH);
-        line.setAttribute("x2", 486 - 30);
-        line.setAttribute("y2", 26 + r * rowH);
-        line.setAttribute("stroke", "#5c3a1e");
-        line.setAttribute("stroke-width", "2");
-        svg.appendChild(line);
-    }
-
-    // Files (Vertical) - split by River between row 4 & 5
-    for (let c = 0; c < 9; c++) {
-        const x = 24 + c * colW;
-        if (c === 0 || c === 8) {
-            // Full line
-            const line = document.createElementNS(svgNS, "line");
-            line.setAttribute("x1", x);
-            line.setAttribute("y1", 26);
-            line.setAttribute("x2", x);
-            line.setAttribute("y2", 26 + 9 * rowH);
-            line.setAttribute("stroke", "#5c3a1e");
-            line.setAttribute("stroke-width", "2");
-            svg.appendChild(line);
-        } else {
-            // Top half
-            const line1 = document.createElementNS(svgNS, "line");
-            line1.setAttribute("x1", x);
-            line1.setAttribute("y1", 26);
-            line1.setAttribute("x2", x);
-            line1.setAttribute("y2", 26 + 4 * rowH);
-            line1.setAttribute("stroke", "#5c3a1e");
-            line1.setAttribute("stroke-width", "2");
-            svg.appendChild(line1);
-
-            // Bottom half
-            const line2 = document.createElementNS(svgNS, "line");
-            line2.setAttribute("x1", x);
-            line2.setAttribute("y1", 26 + 5 * rowH);
-            line2.setAttribute("x2", x);
-            line2.setAttribute("y2", 26 + 9 * rowH);
-            line2.setAttribute("stroke", "#5c3a1e");
-            line2.setAttribute("stroke-width", "2");
-            svg.appendChild(line2);
-        }
-    }
-
-    // Palaces (X lines)
-    // Red Palace (rows 7-9, cols 3-5)
-    drawX(svg, svgNS, 3 * colW + 24, 7 * rowH + 26, 5 * colW + 24, 9 * rowH + 26);
-    // Black Palace (rows 0-2, cols 3-5)
-    drawX(svg, svgNS, 3 * colW + 24, 0 * rowH + 26, 5 * colW + 24, 2 * rowH + 26);
-
-    // River Text
-    const textRiver = document.createElementNS(svgNS, "text");
-    textRiver.setAttribute("x", "240");
-    textRiver.setAttribute("y", 26 + 4.65 * rowH);
-    textRiver.setAttribute("font-size", "22");
-    textRiver.setAttribute("font-family", "'Noto Serif TC', serif");
-    textRiver.setAttribute("font-weight", "900");
-    textRiver.setAttribute("fill", "#8b5a2b");
-    textRiver.setAttribute("text-anchor", "middle");
-    textRiver.textContent = "楚 河           漢 界";
-    svg.appendChild(textRiver);
-
-    boardEl.appendChild(svg);
-}
-
-function drawX(svg, svgNS, x1, y1, x2, y2) {
-    const l1 = document.createElementNS(svgNS, "line");
-    l1.setAttribute("x1", x1); l1.setAttribute("y1", y1);
-    l1.setAttribute("x2", x2); l1.setAttribute("y2", y2);
-    l1.setAttribute("stroke", "#5c3a1e"); l1.setAttribute("stroke-width", "1.5");
-    svg.appendChild(l1);
-
-    const l2 = document.createElementNS(svgNS, "line");
-    l2.setAttribute("x1", x2); l2.setAttribute("y1", y1);
-    l2.setAttribute("x2", x1); l2.setAttribute("y2", y2);
-    l2.setAttribute("stroke", "#5c3a1e"); l2.setAttribute("stroke-width", "1.5");
-    svg.appendChild(l2);
-}
 
 // Nạp danh mục kỳ thủ và dựng dropdown — tránh hardcode model trong HTML
 async function loadModels() {
@@ -166,10 +63,15 @@ async function fetchState() {
 }
 
 async function handleStep() {
+    // Tên bên sắp đi, lấy TRƯỚC khi gọi API để lớp phủ nói đúng ai đang nghĩ
+    const thinkingPlayer = currentState
+        ? (currentState.turn === 'w' ? currentState.red_config.name : currentState.black_config.name)
+        : null;
+    showThinking(thinkingPlayer);
     try {
-        playPieceSound();
         const resp = await fetch('/api/step', { method: 'POST' });
         const data = await resp.json();
+        playPieceSound();
         updateUI(data);
 
         // TTS Speech synthesis if enabled
@@ -183,7 +85,33 @@ async function handleStep() {
         }
     } catch (e) {
         console.error("Step error:", e);
+        document.getElementById('referee-text').textContent =
+            'Lỗi gọi máy chủ — kiểm tra terminal đang chạy server.';
+    } finally {
+        hideThinking();
     }
+}
+
+// Lớp phủ trong lúc chờ AI trả lời, kèm đồng hồ đếm để biết đã chờ bao lâu
+let thinkingTimer = null;
+
+function showThinking(playerName) {
+    const overlay = document.getElementById('thinking-overlay');
+    const label = document.getElementById('thinking-text');
+    const startedAt = Date.now();
+    const who = playerName ? `${playerName} đang suy nghĩ` : 'Đang suy nghĩ';
+
+    label.textContent = `${who}…`;
+    overlay.classList.add('visible');
+    clearInterval(thinkingTimer);
+    thinkingTimer = setInterval(() => {
+        label.textContent = `${who}… ${((Date.now() - startedAt) / 1000).toFixed(0)}s`;
+    }, 500);
+}
+
+function hideThinking() {
+    clearInterval(thinkingTimer);
+    document.getElementById('thinking-overlay').classList.remove('visible');
 }
 
 function toggleAutoPlay() {
@@ -289,16 +217,16 @@ function updateUI(state) {
         }
     }
 
-    // Render Chess Pieces from FEN
-    renderPiecesFromFEN(state.fen, state.last_move);
+    renderPieces(document.getElementById('board'), state.fen, state.last_move);
 }
 
-// Nhãn model dưới tên kỳ thủ; lấy từ danh mục nạp qua /api/models
+// Dòng phụ dưới tên kỳ thủ: nêu nhà cung cấp và ID model chính xác, không lặp lại tên
+// (tên kỳ thủ mặc định đã là nhãn model nên lặp lại là dư thừa)
 function describeConfig(config) {
     const model = availableModels.find(m => m.key === config.model_key);
-    if (!model) return config.model_key || 'Mock';
-    const effort = config.effort ? ` · effort ${config.effort}` : '';
-    return `${model.label}${effort}`;
+    if (!model) return config.model_key || 'mock';
+    const effort = config.effort && model.provider === 'anthropic' ? ` · effort ${config.effort}` : '';
+    return `${model.provider} · ${model.model_id}${effort}`;
 }
 
 function updatePlayerStats(sideKey, stats) {
@@ -325,9 +253,18 @@ function updateEvalBar(evalCp) {
     const redShare = 50 + 50 * (2 / (1 + Math.exp(-0.004 * clamped)) - 1);
     document.getElementById('eval-bar-fill').style.height = `${redShare.toFixed(1)}%`;
 
-    const pawnUnits = (cp / 100).toFixed(1);
-    document.getElementById('eval-value-red').textContent = cp >= 0 ? `+${pawnUnits}` : pawnUnits;
-    document.getElementById('eval-value-black').textContent = cp <= 0 ? `+${(-cp / 100).toFixed(1)}` : `${(-cp / 100).toFixed(1)}`;
+    // Chỉ bên đang có ưu thế mới hiện con số — hai đầu cùng hiện "+0.0" gây rối cho
+    // người xem. Đơn vị quy về "quân" (100 centipawn = 1 quân) cho dễ hiểu.
+    const advantage = Math.abs(cp / 100).toFixed(1);
+    const redLabel = document.getElementById('eval-value-red');
+    const blackLabel = document.getElementById('eval-value-black');
+    const redAhead = cp > 20;
+    const blackAhead = cp < -20;
+
+    redLabel.textContent = redAhead ? `ĐỎ +${advantage}` : 'ĐỎ';
+    blackLabel.textContent = blackAhead ? `ĐEN +${advantage}` : 'ĐEN';
+    redLabel.classList.toggle('leading', redAhead);
+    blackLabel.classList.toggle('leading', blackAhead);
 }
 
 // Badge chất lượng hiện trên thẻ của người vừa đi; xoá badge của bên còn lại
@@ -359,63 +296,6 @@ function updateAnalysisWarning(state) {
     }
     warningEl.hidden = false;
     warningEl.textContent = `⚠️ Chưa chấm điểm nước đi: ${state.analysis_note || 'chạy ./scripts/install-pikafish.sh để bật'}`;
-}
-
-function renderPiecesFromFEN(fen, lastMove) {
-    const boardEl = document.getElementById('board');
-    // Remove existing piece elements
-    const oldPieces = boardEl.querySelectorAll('.piece');
-    oldPieces.forEach(p => p.remove());
-
-    const fenBoard = fen.split(' ')[0];
-    const rows = fenBoard.split('/');
-
-    const colW = 480 / 8;
-    const rowH = 533 / 9;
-
-    let lastMoveFrom = null;
-    let lastMoveTo = null;
-    if (lastMove && lastMove.ucci && lastMove.ucci.length === 4) {
-        lastMoveFrom = ucciToPos(lastMove.ucci.substring(0, 2));
-        lastMoveTo = ucciToPos(lastMove.ucci.substring(2, 4));
-    }
-
-    for (let r = 0; r < 10; r++) {
-        let c = 0;
-        const rowStr = rows[r];
-        for (let i = 0; i < rowStr.length; i++) {
-            const char = rowStr[i];
-            if (!isNaN(char)) {
-                c += parseInt(char, 10);
-            } else {
-                const pieceDiv = document.createElement('div');
-                const isRed = (char === char.toUpperCase());
-                pieceDiv.className = `piece ${isRed ? 'red-piece' : 'black-piece'}`;
-                pieceDiv.textContent = PIECE_SYMBOLS_VI[char] || char;
-
-                const leftPx = 24 + c * colW - 24; // center piece
-                const topPx = 26 + r * rowH - 24;
-
-                pieceDiv.style.left = `${leftPx}px`;
-                pieceDiv.style.top = `${topPx}px`;
-
-                // Highlight last move target
-                if (lastMoveTo && lastMoveTo.r === r && lastMoveTo.c === c) {
-                    pieceDiv.classList.add('last-move');
-                }
-
-                boardEl.appendChild(pieceDiv);
-                c++;
-            }
-        }
-    }
-}
-
-function ucciToPos(ucci) {
-    if (!ucci || ucci.length < 2) return null;
-    const col = ucci.charCodeAt(0) - 'a'.charCodeAt(0);
-    const rank = parseInt(ucci[1], 10);
-    return { r: 9 - rank, c: col };
 }
 
 // Web Speech Synthesis (TTS) — đọc ký hiệu cờ tướng ("Pháo 2 bình 5") rồi tới lời bình

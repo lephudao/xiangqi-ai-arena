@@ -233,11 +233,25 @@ body {
     justify-content: center;
     height: 100%;
     position: relative;
+    min-height: 0;   /* cho phép con co lại trong grid, nếu không sẽ tràn khung */
+}
+
+/* Hàng ngang chứa [eval bar][bàn cờ] — trước đây eval bar nằm trong khung gỗ nên
+   xếp phía trên bàn cờ và đẩy bàn cờ ra khỏi màn hình */
+.board-stage {
+    display: flex;
+    align-items: stretch;
+    gap: 14px;
+    min-height: 0;
+    flex: 1;
+    max-height: 100%;
 }
 
 .board-wrapper {
     position: relative;
-    padding: 16px;
+    padding: 14px;
+    display: flex;
+    min-height: 0;
     background: #4a2c11;
     border-radius: 16px;
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), inset 0 0 10px rgba(0, 0, 0, 0.8);
@@ -245,8 +259,11 @@ body {
 }
 
 .xiangqi-board {
-    width: 480px;
-    height: 533px; /* 9 cols x 10 rows aspect ratio */
+    /* Tỉ lệ 480:533 giữ nguyên, nhưng kích thước tính theo chiều cao còn trống để cả
+       studio vừa trong một màn hình — điều kiện cần khi quay màn hình/OBS */
+    aspect-ratio: 480 / 533;
+    height: min(533px, 100%);
+    width: auto;
     background: var(--board-bg);
     border-radius: 8px;
     position: relative;
@@ -560,12 +577,16 @@ input:checked + .slider::before { transform: translateX(18px); }
     flex-direction: column;
     align-items: center;
     gap: 6px;
+    /* Chừa chỗ ngang bằng padding khung gỗ để cột điểm thẳng hàng với bàn cờ */
+    padding: 14px 0;
+    min-height: 0;
 }
 
 .eval-bar {
     position: relative;
-    width: 22px;
-    height: 420px;
+    width: 20px;
+    flex: 1;
+    min-height: 0;
     border-radius: 11px;
     overflow: hidden;
     background: #0f172a;
@@ -640,4 +661,96 @@ input:checked + .slider::before { transform: translateX(18px); }
     color: #fbbf24;
     text-align: center;
     margin-top: 4px;
+}
+
+/* ===== Chỉ báo "đang suy nghĩ" =====
+   Mỗi nước AI mất 5-30 giây nên cần chỉ báo, NHƯNG không được che bàn cờ: người xem
+   video phải luôn thấy được thế cờ. Vì vậy dùng một pill nhỏ nổi ở đáy bàn. */
+.thinking-overlay {
+    position: absolute;
+    /* Nằm trên viền khung gỗ, KHÔNG phủ lên ô cờ nào — người xem luôn thấy đủ thế cờ */
+    bottom: -13px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 16px;
+    background: rgba(15, 23, 42, 0.92);
+    border: 1px solid rgba(245, 158, 11, 0.55);
+    border-radius: 999px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
+    z-index: 30;
+    white-space: nowrap;
+}
+
+.thinking-overlay.visible { display: flex; }
+
+.thinking-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2.5px solid rgba(245, 158, 11, 0.25);
+    border-top-color: var(--primary-gold);
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.thinking-text {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--primary-gold);
+}
+
+/* Quân Đen đậm hơn để phân biệt rõ với quân Đỏ khi lên video */
+.piece.black-piece {
+    background: radial-gradient(circle, #e2e8f0 0%, #94a3b8 45%, #1e293b 100%);
+    color: #0b1220;
+    border: 2px solid #0b1220;
+}
+
+/* ===== Quân cờ co giãn theo bàn =====
+   Kích thước và cỡ chữ tính theo bàn cờ (đơn vị container query) để bàn cờ đổi kích thước
+   thì quân vẫn đúng tỉ lệ. Trước đây quân cố định 48px nên lệch khi bàn co lại. */
+.xiangqi-board {
+    container-type: size;
+}
+
+.piece {
+    width: 10.5%;
+    height: auto;
+    aspect-ratio: 1;
+    /* Toạ độ left/top là giao điểm lưới -> dịch về tâm quân */
+    transform: translate(-50%, -50%);
+    font-size: clamp(14px, 5.6cqw, 26px);
+}
+
+.piece.last-move {
+    transform: translate(-50%, -50%) scale(1.12);
+}
+
+/* Dấu ô xuất phát của nước vừa đi */
+.move-marker {
+    position: absolute;
+    width: 10.5%;
+    aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+    border: 2px dashed rgba(245, 158, 11, 0.9);
+    border-radius: 50%;
+    z-index: 5;
+    pointer-events: none;
+}
+
+/* Bên đang dẫn được làm nổi bật trên eval bar */
+.eval-value {
+    color: var(--text-muted);
+    font-size: 11px;
+    letter-spacing: 0.5px;
+}
+
+.eval-value.leading {
+    color: var(--primary-gold);
+    font-weight: 800;
 }
