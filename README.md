@@ -123,6 +123,15 @@ venv/bin/python3 -m pytest tests/ -q
 ```
 Mốc kiểm chứng chính: thế khai cuộc có đúng **44 nước đi hợp lệ**.
 
+## Tài liệu
+
+| Tài liệu | Nội dung |
+|---|---|
+| [docs/project-overview-pdr.md](docs/project-overview-pdr.md) | Mục tiêu, **luật thi đấu** đảm bảo công bằng, cách đo chất lượng nước đi, chi phí |
+| [docs/system-architecture.md](docs/system-architecture.md) | Kiến trúc, luồng một nước đi, các quyết định thiết kế và lý do |
+| [docs/codebase-summary.md](docs/codebase-summary.md) | Bản đồ mã nguồn, sửa gì thì mở file nào, nợ kỹ thuật |
+| [docs/deployment-guide.md](docs/deployment-guide.md) | Cài đặt, an toàn vận hành, chặn chi phí, quay video, xử lý sự cố |
+
 ## Lộ trình
 
 Xem [plans/260730-0811-xiangqi-ai-arena-upgrade/plan.md](plans/260730-0811-xiangqi-ai-arena-upgrade/plan.md):
