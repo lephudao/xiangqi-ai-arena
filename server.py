@@ -116,6 +116,36 @@ def get_models():
     })
 
 
+@app.route("/api/replays", methods=["GET"])
+def list_replays():
+    """
+    Các trận đã lưu trong cơ sở dữ liệu, kể cả trận từ những lần chạy trước.
+    Replay đọc từ đây nên KHÔNG tốn tiền API — quay lại bao nhiêu lần cũng được.
+    """
+    if manager.repository is None:
+        return jsonify({"replays": [], "note": "Chưa bật lưu trữ trận"})
+    return jsonify({"replays": manager.repository.list_matches(limit=100)})
+
+
+@app.route("/api/replays/<match_id>", methods=["GET"])
+def get_replay(match_id):
+    """Toàn bộ dữ liệu để xem lại một trận: thông tin trận + mọi nước kèm điểm chấm."""
+    if manager.repository is None:
+        return jsonify({"error": "Chưa bật lưu trữ trận"}), 404
+    match = manager.repository.get_match(match_id)
+    if match is None:
+        return jsonify({"error": f"Không có trận '{match_id}' trong cơ sở dữ liệu"}), 404
+    return jsonify({"match": match, "moves": manager.repository.get_moves(match_id)})
+
+
+@app.route("/api/leaderboard", methods=["GET"])
+def get_leaderboard():
+    """Bảng xếp hạng Elo — chỉ tính các trận kết thúc đúng luật cờ."""
+    if manager.repository is None:
+        return jsonify({"leaderboard": []})
+    return jsonify({"leaderboard": manager.repository.leaderboard()})
+
+
 @app.route("/api/history", methods=["GET"])
 @app.route("/api/matches/<match_id>/history", methods=["GET"])
 def get_history(match_id=None):

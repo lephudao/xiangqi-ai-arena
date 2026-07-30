@@ -9,8 +9,8 @@ from engine.match_manager import MAX_ACTIVE_MATCHES, MatchManager
 
 
 def _manager():
-    """Manager tắt chấm điểm engine để test chạy nhanh."""
-    return MatchManager(analysis_engine=None)
+    """Manager tắt chấm điểm engine và tắt ghi cơ sở dữ liệu để test chạy nhanh, không tạo file."""
+    return MatchManager(analysis_engine=None, repository=False)
 
 
 def test_matches_are_independent():
@@ -112,7 +112,7 @@ def test_eviction_keeps_capacity_and_never_drops_current():
 def test_matches_share_one_analysis_engine():
     """Mỗi tiến trình Pikafish tốn ~50MB cho bảng NNUE — không mở một cái cho mỗi trận."""
     sentinel = object()
-    manager = MatchManager(analysis_engine=sentinel)
+    manager = MatchManager(analysis_engine=sentinel, repository=False)
     _, first = manager.create()
     _, second = manager.create()
 

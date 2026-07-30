@@ -798,3 +798,135 @@ input:checked + .slider::before { transform: translateX(18px); }
     font-size: 13px;
     font-variant-numeric: tabular-nums;
 }
+
+/* ===== Thanh xem lại trận ===== */
+.replay-bar {
+    margin-top: 10px;
+    width: 100%;
+    max-width: 620px;
+    background: rgba(15, 23, 42, 0.92);
+    border: 1px solid rgba(124, 58, 237, 0.5);
+    border-radius: 12px;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.replay-bar-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.replay-badge {
+    background: #7c3aed;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.replay-title {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.replay-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.replay-controls input[type="range"] {
+    flex: 1;
+    min-width: 60px;
+    accent-color: var(--primary-gold);
+}
+
+.replay-counter {
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+    min-width: 62px;
+    text-align: center;
+}
+
+.btn-small {
+    padding: 5px 10px;
+    font-size: 12px;
+}
+
+/* Đang xem lại thì ẩn các nút gọi API để không trộn hai chế độ */
+body.replay-mode .controls-left,
+body.replay-mode .cost-meter,
+body.replay-mode .budget-input {
+    opacity: 0.35;
+    pointer-events: none;
+}
+
+/* ===== Danh sách trận + bảng xếp hạng ===== */
+.modal-wide { max-width: 860px; }
+
+.section-title {
+    font-size: 15px;
+    font-weight: 800;
+    margin: 18px 0 4px;
+    color: var(--primary-gold);
+}
+
+.section-title:first-child { margin-top: 0; }
+
+.section-note {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+}
+
+.data-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.data-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+.data-row .grow { flex: 1; min-width: 0; }
+.data-row .rank {
+    width: 22px;
+    font-weight: 800;
+    color: var(--primary-gold);
+}
+.data-row .elo {
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: #34d399;
+}
+.data-row .muted {
+    color: var(--text-muted);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.data-empty {
+    padding: 14px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+}

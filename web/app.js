@@ -4,12 +4,14 @@
  */
 
 import { renderBoardGrid, renderPieces } from './js/board-renderer.js';
+import { ReplayController } from './js/replay-controller.js';
 
 let currentState = null;
 let isAutoPlaying = false;
 let autoPlayTimer = null;
 let synth = window.speechSynthesis;
 let availableModels = [];
+let replay = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
     renderBoardGrid(document.getElementById('board'));
@@ -24,7 +26,216 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-close-modal').addEventListener('click', closeModal);
     document.getElementById('btn-save-config').addEventListener('click', saveConfig);
     document.getElementById('btn-close-result').addEventListener('click', hideResultBanner);
+
+    setupReplay();
 });
+
+// ===== Xem lại trận đã lưu (đọc từ cơ sở dữ liệu, không gọi API AI) =====
+
+function setupReplay() {
+    replay = new ReplayController({
+        boardElement: document.getElementById('board'),
+        onFrame: renderReplayFrame,
+    });
+
+    document.getElementById('btn-open-replays').addEventListener('click', openReplayList);
+    document.getElementById('btn-close-replays').addEventListener('click',
+        () => document.getElementById('modal-replays').classList.add('hidden'));
+    document.getElementById('btn-replay-exit').addEventListener('click', exitReplay);
+    document.getElementById('btn-replay-start').addEventListener('click', () => replay.seek(-1));
+    document.getElementById('btn-replay-prev').addEventListener('click', () => replay.previous());
+    document.getElementById('btn-replay-next').addEventListener('click', () => replay.next());
+    document.getElementById('btn-replay-play').addEventListener('click', () => {
+        const interval = parseInt(document.getElementById('sel-speed').value, 10) || 1200;
+        replay.togglePlay(interval);
+        updateReplayPlayButton();
+    });
+    document.getElementById('btn-replay-worst').addEventListener('click', () => {
+        replay.pause();
+        updateReplayPlayButton();
+        if (!replay.seekWorstMove()) {
+            document.getElementById('referee-text').textContent =
+                'Trận này không có nước nào được chấm điểm (thiếu engine khi chạy).';
+        }
+    });
+    document.getElementById('replay-slider').addEventListener('input', (event) => {
+        replay.pause();
+        updateReplayPlayButton();
+        replay.seek(parseInt(event.target.value, 10));
+    });
+}
+
+async function openReplayList() {
+    const modal = document.getElementById('modal-replays');
+    modal.classList.remove('hidden');
+    await Promise.all([loadLeaderboard(), loadReplayList()]);
+}
+
+async function loadLeaderboard() {
+    const container = document.getElementById('leaderboard-list');
+    container.innerHTML = '<div class="data-empty">Đang tải…</div>';
+    try {
+        const { leaderboard } = await (await fetch('/api/leaderboard')).json();
+        if (!leaderboard.length) {
+            container.innerHTML = '<div class="data-empty">Chưa có trận nào kết thúc đúng luật cờ.</div>';
+            return;
+        }
+        container.innerHTML = leaderboard.map((row, index) => `
+            <div class="data-row">
+                <span class="rank">${index + 1}</span>
+                <span class="grow">${escapeHtml(row.label)}</span>
+                <span class="elo">Elo ${row.elo.toFixed(0)}</span>
+                <span class="muted">${row.matches} trận · ${row.wins}W-${row.draws}D-${row.losses}L</span>
+            </div>`).join('');
+    } catch (e) {
+        container.innerHTML = '<div class="data-empty">Không tải được bảng xếp hạng.</div>';
+    }
+}
+
+async function loadReplayList() {
+    const container = document.getElementById('replay-list');
+    container.innerHTML = '<div class="data-empty">Đang tải…</div>';
+    try {
+        const { replays } = await (await fetch('/api/replays')).json();
+        if (!replays.length) {
+            container.innerHTML = '<div class="data-empty">Chưa có trận nào được lưu.</div>';
+            return;
+        }
+        container.innerHTML = replays.map(match => {
+            const accuracy = (match.red_accuracy !== null && match.black_accuracy !== null)
+                ? `${match.red_accuracy}% vs ${match.black_accuracy}%` : 'chưa chấm điểm';
+            return `
+            <div class="data-row replay-row" data-match-id="${match.id}">
+                <span class="grow">
+                    <strong>${escapeHtml(match.red_name)}</strong> vs
+                    <strong>${escapeHtml(match.black_name)}</strong>
+                    <span class="muted"> · ${match.total_plies} nước · ${accuracy}</span>
+                </span>
+                <span class="muted">${describeResult(match)}</span>
+                <button class="btn btn-primary btn-small">Xem lại</button>
+            </div>`;
+        }).join('');
+        container.querySelectorAll('.replay-row').forEach(row => {
+            row.querySelector('button').addEventListener('click',
+                () => startReplay(row.dataset.matchId));
+        });
+    } catch (e) {
+        container.innerHTML = '<div class="data-empty">Không tải được danh sách trận.</div>';
+    }
+}
+
+function describeResult(match) {
+    if (match.status === 'ongoing') {
+        return match.stopped_reason === 'move_limit' ? 'dừng do giới hạn nước'
+            : match.stopped_reason === 'cost_budget' ? 'dừng do hết ngân sách' : 'chưa xong';
+    }
+    if (match.status === 'draw') return 'hoà';
+    return match.status === 'red_win' ? 'Đỏ thắng' : 'Đen thắng';
+}
+
+async function startReplay(matchId) {
+    stopAutoPlay();
+    try {
+        const match = await replay.load(matchId);
+        document.getElementById('modal-replays').classList.add('hidden');
+        document.getElementById('replay-bar').hidden = false;
+        document.body.classList.add('replay-mode');
+        document.getElementById('replay-title').textContent =
+            `${match.red_name} (Đỏ) vs ${match.black_name} (Đen)`;
+        const slider = document.getElementById('replay-slider');
+        slider.min = -1;
+        slider.max = Math.max(0, replay.totalPlies - 1);
+        slider.value = -1;
+    } catch (e) {
+        document.getElementById('referee-text').textContent = `Không xem lại được: ${e.message}`;
+    }
+}
+
+function exitReplay() {
+    replay.close();
+    document.getElementById('replay-bar').hidden = true;
+    document.body.classList.remove('replay-mode');
+    updateReplayPlayButton();
+    fetchState();   // trở về trận đang đấu trực tiếp
+}
+
+function updateReplayPlayButton() {
+    document.getElementById('btn-replay-play').textContent =
+        replay && replay.isPlaying ? '⏸ Dừng' : '▶ Phát';
+}
+
+/** Cập nhật toàn bộ giao diện theo khung hình xem lại (dùng lại các hàm của chế độ live). */
+function renderReplayFrame(frame) {
+    const { match, move, index, total, stats } = frame;
+
+    document.getElementById('replay-counter').textContent = `${index + 1} / ${total}`;
+    document.getElementById('replay-slider').value = index;
+    updateReplayPlayButton();
+
+    document.getElementById('name-red').textContent = match.red_name;
+    document.getElementById('name-black').textContent = match.black_name;
+    document.getElementById('model-red').textContent = match.red_model_key;
+    document.getElementById('model-black').textContent = match.black_model_key;
+
+    const turnBadge = document.getElementById('turn-badge');
+    const nextSide = move ? (move.side === 'w' ? 'b' : 'w') : 'w';
+    turnBadge.textContent = nextSide === 'w' ? 'LƯỢT QUÂN ĐỎ' : 'LƯỢT QUÂN ĐEN';
+    turnBadge.className = `turn-indicator ${nextSide === 'w' ? 'turn-red' : 'turn-black'}`;
+    document.getElementById('move-counter').textContent = `Nước: #${index + 1}`;
+    document.getElementById('check-alert').classList.toggle('visible', !!move?.in_check_after);
+
+    updateEvalBar(stats.eval_cp);
+    ['red', 'black'].forEach(sideKey => {
+        const side = stats[sideKey];
+        const accuracyEl = document.getElementById(`accuracy-${sideKey}`);
+        accuracyEl.textContent = side.accuracy === null
+            ? 'Độ chính xác: —'
+            : `Độ chính xác: ${side.accuracy}% · Blunder: ${side.blunders}`;
+        const illegalEl = document.getElementById(`illegal-${sideKey}`);
+        illegalEl.textContent = `Sai luật: ${side.illegal_attempts}`;
+        illegalEl.classList.toggle('has-violation', side.illegal_attempts > 0);
+        document.getElementById(`latency-${sideKey}`).textContent = '';
+    });
+    document.getElementById('cost-value').textContent =
+        `$${(stats.red.cost_usd + stats.black.cost_usd).toFixed(4)}`;
+
+    // Badge chất lượng + lời thoại của nước đang xem
+    updateQualityBadge(move ? {
+        side: move.side,
+        evaluation: move.quality ? {
+            quality: move.quality,
+            quality_label: qualityLabel(move.quality),
+            cp_loss: move.cp_loss,
+        } : null,
+    } : null);
+
+    if (move) {
+        const sideKey = move.side === 'w' ? 'red' : 'black';
+        document.getElementById(`reasoning-${sideKey}`).textContent = `"${move.taunt || ''}"`;
+        const engineNote = move.engine_bestmove && move.cp_loss >= 200
+            ? ` — engine khuyên ${move.engine_bestmove}` : '';
+        document.getElementById('referee-text').textContent =
+            `Nước #${index + 1}: ${move.vi_notation} [${move.ucci}]`
+            + `${move.quality ? ' — ' + qualityLabel(move.quality) : ''}${engineNote}`;
+    } else {
+        document.getElementById('referee-text').textContent = 'Thế cờ ban đầu — bấm ▶ để xem lại.';
+    }
+}
+
+const QUALITY_LABELS = {
+    best: '⭐ NƯỚC HAY NHẤT', good: '✅ Tốt', fair: '🟢 Khá',
+    inaccuracy: '🟡 Thiếu chính xác', mistake: '🟠 SAI NƯỚC', blunder: '🔴 BLUNDER!',
+};
+
+function qualityLabel(quality) {
+    return QUALITY_LABELS[quality] || quality;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text ?? '';
+    return div.innerHTML;
+}
 
 // Nạp danh mục kỳ thủ và dựng dropdown — tránh hardcode model trong HTML
 async function loadModels() {
@@ -63,6 +274,7 @@ async function fetchState() {
 }
 
 async function handleStep() {
+    if (replay && replay.isActive) return;   // đang xem lại thì không gọi API
     // Tên bên sắp đi, lấy TRƯỚC khi gọi API để lớp phủ nói đúng ai đang nghĩ
     const thinkingPlayer = currentState
         ? (currentState.turn === 'w' ? currentState.red_config.name : currentState.black_config.name)
@@ -284,6 +496,9 @@ function updatePlayerStats(sideKey, stats) {
 
 // Eval bar: cp dương = Đỏ ưu thế. Nén bằng hàm phi tuyến để lợi thế nhỏ vẫn thấy được
 // và lợi thế lớn không làm cột chạm đáy ngay.
+// Engine quy thế chiếu bí về khoảng ±30000 centipawn
+const MATE_SCORE_THRESHOLD = 20000;
+
 function updateEvalBar(evalCp) {
     const cp = evalCp || 0;
     const clamped = Math.max(-1000, Math.min(1000, cp));
@@ -292,14 +507,17 @@ function updateEvalBar(evalCp) {
 
     // Chỉ bên đang có ưu thế mới hiện con số — hai đầu cùng hiện "+0.0" gây rối cho
     // người xem. Đơn vị quy về "quân" (100 centipawn = 1 quân) cho dễ hiểu.
-    const advantage = Math.abs(cp / 100).toFixed(1);
+    // Thế chiếu bí được engine quy về ±30000 centipawn; chia 100 sẽ ra "+293.0" vô nghĩa,
+    // nên hiển thị chữ "BÍ" thay vì con số.
+    const isMate = Math.abs(cp) > MATE_SCORE_THRESHOLD;
+    const advantage = isMate ? 'BÍ' : `+${Math.abs(cp / 100).toFixed(1)}`;
     const redLabel = document.getElementById('eval-value-red');
     const blackLabel = document.getElementById('eval-value-black');
     const redAhead = cp > 20;
     const blackAhead = cp < -20;
 
-    redLabel.textContent = redAhead ? `ĐỎ +${advantage}` : 'ĐỎ';
-    blackLabel.textContent = blackAhead ? `ĐEN +${advantage}` : 'ĐEN';
+    redLabel.textContent = redAhead ? `ĐỎ ${advantage}` : 'ĐỎ';
+    blackLabel.textContent = blackAhead ? `ĐEN ${advantage}` : 'ĐEN';
     redLabel.classList.toggle('leading', redAhead);
     blackLabel.classList.toggle('leading', blackAhead);
 }

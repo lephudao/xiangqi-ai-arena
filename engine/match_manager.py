@@ -15,15 +15,18 @@ from datetime import datetime
 
 from engine.analysis import PikafishEngine
 from engine.referee import MatchReferee
+from engine.storage import MatchRepository
 
 # Giới hạn số trận giữ trong bộ nhớ; trận cũ nhất bị loại khi vượt ngưỡng
 MAX_ACTIVE_MATCHES = 20
 
 
 class MatchManager:
-    def __init__(self, analysis_engine=None):
+    def __init__(self, analysis_engine=None, repository=None):
         # Một engine dùng chung cho tất cả các trận
         self.analysis_engine = analysis_engine if analysis_engine is not None else PikafishEngine()
+        # Kho lưu trận dùng chung; truyền repository=False để tắt hẳn việc ghi (dùng trong test)
+        self.repository = MatchRepository() if repository is None else (repository or None)
         self._matches = {}          # match_id -> MatchReferee
         self._created_at = {}       # match_id -> thời điểm tạo (để hiển thị)
         self._sequence = {}         # match_id -> số thứ tự tạo (để sắp xếp)
@@ -41,6 +44,9 @@ class MatchManager:
         """
         match_id = uuid.uuid4().hex[:12]
         referee = MatchReferee(red_config, black_config, analysis_engine=self.analysis_engine)
+        if self.repository is not None:
+            # Dùng chung một id giữa bộ nhớ và cơ sở dữ liệu để replay tra được đúng trận
+            referee.attach_recorder(self.repository, match_id=match_id)
 
         with self._lock:
             self._matches[match_id] = referee
@@ -128,6 +134,8 @@ class MatchManager:
             return True
 
     def close(self):
-        """Đóng tiến trình engine. Gọi khi tắt server."""
+        """Đóng tiến trình engine và kết nối cơ sở dữ liệu. Gọi khi tắt server."""
         if self.analysis_engine is not None:
             self.analysis_engine.close()
+        if self.repository is not None:
+            self.repository.close()

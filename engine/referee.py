@@ -69,6 +69,28 @@ def _new_player_stats():
 
 
 class MatchReferee:
+    def attach_recorder(self, repository, match_id=None):
+        """
+        Gắn kho lưu trữ để ghi lại trận. Ghi ngay sau MỖI nước đi, vì một trận LLM chạy
+        30-60 phút và tốn tiền API thật — chỉ ghi lúc kết thúc là mất trắng nếu gặp sự cố.
+        """
+        from engine.model_registry import get_model
+
+        def side_info(config):
+            model = get_model(config.get("model_key", "mock"))
+            return {
+                "model_key": config.get("model_key", "mock"),
+                "name": config["name"],
+                "provider": model.provider if model else None,
+            }
+
+        self.recorder = repository
+        self.record_id = repository.create_match(
+            side_info(self.red_config), side_info(self.black_config),
+            initial_fen=self.board.to_fen(), match_id=match_id,
+        )
+        return self.record_id
+
     def __init__(self, red_config=None, black_config=None, analysis_engine=AUTO_ANALYSIS_ENGINE):
         self.red_config = normalize_config(red_config or DEFAULT_RED_CONFIG, "Kỳ thủ Đỏ")
         self.black_config = normalize_config(black_config or DEFAULT_BLACK_CONFIG, "Kỳ thủ Đen")
@@ -104,6 +126,7 @@ class MatchReferee:
 
         self.game_over = False
         self.winner = None            # tên người thắng, None nếu hoà/đang đấu
+        self.winner_side = None       # 'w' | 'b' | None — Elo cần bên thắng, không phải tên
         self.result_status = STATUS_ONGOING
         self.result_reason = STATUS_ONGOING
         self.last_move = None
@@ -111,6 +134,8 @@ class MatchReferee:
         self.stats = {'w': _new_player_stats(), 'b': _new_player_stats()}
         self.evaluations = {'w': [], 'b': []}   # MoveEvaluation theo từng bên
         self.current_cp = 0                     # điểm thế cờ theo góc nhìn Đỏ, cho eval bar
+        self.recorder = None                    # kho lưu trữ, gắn qua attach_recorder()
+        self.record_id = None
         self.referee_log = [opening_message] + self._pending_notes
 
     def reset(self, red_config=None, black_config=None):
@@ -118,7 +143,13 @@ class MatchReferee:
             self.red_config = normalize_config(red_config, "Kỳ thủ Đỏ")
         if black_config:
             self.black_config = normalize_config(black_config, "Kỳ thủ Đen")
+
+        # Giữ lại kho lưu trữ qua các lần lập lại, nhưng mở BẢN GHI MỚI: đây là một trận
+        # khác, không được ghi tiếp vào bản ghi của trận cũ.
+        repository = self.recorder
         self._start_new_game("Trọng tài: Trận mới BẮT ĐẦU!")
+        if repository is not None:
+            self.attach_recorder(repository)
 
     # --- Thông tin bên đang đi ---
 
@@ -198,6 +229,11 @@ class MatchReferee:
         self.move_logs.append(self.last_move)
 
         ply = len(self.move_logs)
+        if self.recorder is not None:
+            self.recorder.append_move(
+                self.record_id, ply, self.last_move,
+                fen_after=self.board.to_fen(), in_check_after=self.board.is_in_check(),
+            )
         quality_suffix = f" — {evaluation.quality_label_vi}" if evaluation else ""
         self._log(
             f"Nước #{ply}: {self._player_name(side)} đi {vi_notation} "
@@ -306,6 +342,7 @@ class MatchReferee:
         self.result_reason = result.reason
         reason_vi = RESULT_MESSAGES_VI.get(result.reason, result.reason)
 
+        self.winner_side = result.winner_side
         if result.status == STATUS_DRAW:
             self.winner = None
             self._log(f"Trọng tài: TRẬN ĐẤU KẾT THÚC — {reason_vi}")
@@ -313,6 +350,12 @@ class MatchReferee:
             self.winner = self._player_name(result.winner_side)
             loser = self._player_name('b' if result.winner_side == 'w' else 'w')
             self._log(f"Trọng tài: {reason_vi}! {self.winner} THẮNG ({loser} thua)")
+
+        if self.recorder is not None:
+            self.recorder.finish_match(
+                self.record_id, self.get_state(),
+                {"red": self.stats['w'], "black": self.stats['b']},
+            )
 
     # --- Trạng thái cho API ---
 
@@ -326,6 +369,7 @@ class MatchReferee:
             "in_check": self.board.is_in_check(),
             "game_over": self.game_over,
             "winner": self.winner,
+            "winner_side": self.winner_side,
             "result_status": self.result_status,
             "result_reason": self.result_reason,
             "result_text": RESULT_MESSAGES_VI.get(self.result_reason, ""),

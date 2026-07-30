@@ -24,6 +24,7 @@
                 <span id="move-counter" class="move-badge">Lượt: #1</span>
             </div>
             <div class="header-controls">
+                <button id="btn-open-replays" class="btn btn-secondary">📼 Xem Lại</button>
                 <button id="btn-toggle-panel" class="btn btn-secondary">⚙️ Cấu Hình</button>
             </div>
         </header>
@@ -84,6 +85,25 @@
                     <span id="referee-text">Trận đấu đang chờ bắt đầu...</span>
                 </div>
                 <div class="analysis-warning" id="analysis-warning" hidden></div>
+
+                <!-- Thanh xem lại: đọc từ cơ sở dữ liệu nên không tốn tiền API -->
+                <div class="replay-bar" id="replay-bar" hidden>
+                    <div class="replay-bar-top">
+                        <span class="replay-badge">📼 XEM LẠI</span>
+                        <span class="replay-title" id="replay-title">—</span>
+                        <button id="btn-replay-exit" class="btn btn-secondary btn-small">✕ Thoát</button>
+                    </div>
+                    <div class="replay-controls">
+                        <button id="btn-replay-start" class="btn btn-secondary btn-small" title="Về đầu trận">⏮</button>
+                        <button id="btn-replay-prev" class="btn btn-secondary btn-small" title="Nước trước">◀</button>
+                        <button id="btn-replay-play" class="btn btn-primary btn-small">▶ Phát</button>
+                        <button id="btn-replay-next" class="btn btn-secondary btn-small" title="Nước sau">▶</button>
+                        <input type="range" id="replay-slider" min="-1" max="0" value="-1" step="1">
+                        <span class="replay-counter" id="replay-counter">0 / 0</span>
+                        <button id="btn-replay-worst" class="btn btn-danger btn-small"
+                                title="Nhảy tới nước sai nặng nhất — thường là điểm xoay chuyển trận">🔴 Nước tệ nhất</button>
+                    </div>
+                </div>
             </section>
 
             <!-- Right Side: Player 2 (Black Side / Claude) -->
@@ -156,6 +176,26 @@
             <div class="result-winner" id="result-winner">—</div>
             <div class="result-detail" id="result-detail"></div>
             <button id="btn-close-result" class="btn btn-secondary">Đóng</button>
+        </div>
+    </div>
+
+    <!-- Danh sách trận đã lưu + bảng xếp hạng Elo -->
+    <div id="modal-replays" class="modal-overlay hidden">
+        <div class="modal-content modal-wide">
+            <div class="modal-header">
+                <h2>📼 Trận Đã Lưu &amp; Bảng Xếp Hạng</h2>
+                <button id="btn-close-replays" class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <h3 class="section-title">🏆 Bảng xếp hạng Elo</h3>
+                <p class="section-note">Chỉ tính các trận kết thúc đúng luật cờ. Trận dừng vì
+                   hết giới hạn nước hoặc hết ngân sách không được tính.</p>
+                <div id="leaderboard-list" class="data-list"></div>
+
+                <h3 class="section-title">Trận đã lưu</h3>
+                <p class="section-note">Xem lại đọc từ cơ sở dữ liệu — không gọi API, không tốn tiền.</p>
+                <div id="replay-list" class="data-list"></div>
+            </div>
         </div>
     </div>
 
