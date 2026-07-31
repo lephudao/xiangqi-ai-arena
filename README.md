@@ -33,6 +33,23 @@ Copy `.env.example` → `.env.local` (file này đã được gitignore, an toà
 
 API key cũng có thể nhập trực tiếp trong hộp thoại ⚙️ Cấu Hình của giao diện.
 
+## An toàn key khi chia sẻ mã nguồn
+
+Dự án này chạy **local**, không có bản online. Key của bạn không đi đâu ngoài máy bạn và
+máy chủ của chính nhà cung cấp AI.
+
+- Key thật chỉ nằm trong `.env.local` — đã bị `.gitignore` chặn. `.env.example` không chứa key.
+- Key nhập qua giao diện chỉ **giữ trong bộ nhớ** của tiến trình server, không ghi ra đĩa,
+  không ghi vào log, không trả lại trong bất kỳ phản hồi API nào.
+  Có test canh giữ điều này: `tests/test_api_key_privacy.py` (quét cả file cơ sở dữ liệu ở
+  mức byte).
+- `HOST` mặc định `127.0.0.1`: máy khác trong mạng **không** vào được. Hệ thống chưa có xác
+  thực, nên đừng đổi thành `0.0.0.0` khi chưa thêm.
+- Trước khi quay video: key hiển thị dạng che, nhưng vẫn nên kiểm lại khung hình.
+
+Người xem clone về sẽ dùng key của chính họ. Không cần key nào cũng chạy được toàn bộ giao
+diện ở chế độ Mock.
+
 ## Kiến trúc
 
 ```
@@ -140,3 +157,5 @@ Xem [plans/260730-0811-xiangqi-ai-arena-upgrade/plan.md](plans/260730-0811-xiang
 - **Phase 2** (xong) — Pikafish chấm điểm, tầng provider dùng SDK, prompt đầy đủ ngữ cảnh, nhiều trận song song
 - **Phase 3** (xong) — lưu SQLite, xem lại miễn phí, giải vòng tròn, Elo, overlay OBS, báo cáo trận
 - **Phase 4** (xong) — chế độ Người vs AI
+- **Phase 5** — chốt hướng **chỉ chạy local**, chia sẻ mã nguồn qua GitHub thay vì dựng bản
+  online. Xem [plans/260731-0753-byok-tts-trien-khai-cong-khai/plan.md](plans/260731-0753-byok-tts-trien-khai-cong-khai/plan.md)

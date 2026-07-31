@@ -1,6 +1,10 @@
 # Phase 5.2 — Triển khai công khai miễn phí
 
-**Status:** pending | **Est:** ~1 ngày | **Depends:** 5.1
+**Status: HOÃN (2026-07-31)** — chốt hướng chỉ chạy local, chia sẻ mã nguồn qua GitHub.
+Giữ tài liệu này vì phần khảo sát nền tảng và các vấn đề đa người dùng vẫn đúng nếu sau này
+muốn mở lại. Xem [plan.md](plan.md) mục "Quyết định: chỉ chạy local" trước khi dùng lại.
+
+**Est:** ~1 ngày | **Depends:** 5.1
 
 ## Chọn nền tảng
 
