@@ -3,7 +3,14 @@
 **Status:** 5.0 XONG (vá lộ key) · **5.2 HOÃN** (chốt chỉ chạy local) · 5.1 và 5.3 chưa bắt
 đầu | **Ngày:** 2026-07-31
 
-## Quyết định: chỉ chạy local (2026-07-31)
+## Quyết định: chỉ chạy local (2026-07-31) — ĐÃ ĐẢO NGƯỢC cùng ngày
+
+> **Cập nhật:** sau khi làm rõ bản online **không tốn tiền máy chủ** (host tĩnh, trình duyệt
+> tự gọi API AI), đã chốt **làm cả hai**: bản online cho người xem thử, bản local giữ Pikafish
+> thật để quay video. Kế hoạch mới:
+> [plans/260731-0833-ban-online-pyodide-giu-pikafish-local/plan.md](../260731-0833-ban-online-pyodide-giu-pikafish-local/plan.md)
+>
+> Phần dưới giữ nguyên làm ghi chép lý do, các khảo sát vẫn đúng.
 
 Chốt **không dựng bản online**. Hệ thống chạy local để quay video, chia sẻ mã nguồn qua
 GitHub cho người xem tự clone và chạy bằng key của họ.
