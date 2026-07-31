@@ -90,10 +90,14 @@ class MatchReferee:
         from engine.model_registry import get_model
 
         def side_info(config):
-            model = get_model(config.get("model_key", "mock"))
+            model_key = config.get("model_key", "mock")
+            model = get_model(model_key)
             return {
-                "model_key": config.get("model_key", "mock"),
+                "model_key": model_key,
+                # name: tên hiển thị trong trận này (người dùng đặt được)
                 "name": config["name"],
+                # label: danh tính model, dùng cho bảng xếp hạng — không đổi theo từng trận
+                "label": model.label if model else model_key,
                 "provider": model.provider if model else None,
             }
 

@@ -98,8 +98,12 @@ class MatchRepository:
         Trả match_id.
         """
         match_id = match_id or uuid.uuid4().hex[:12]
-        self.ensure_player(red["model_key"], red.get("name", red["model_key"]), red.get("provider"))
-        self.ensure_player(black["model_key"], black.get("name", black["model_key"]),
+        # Nhãn trong bảng xếp hạng là tên MODEL, không phải tên tuỳ chỉnh của một trận.
+        # Nếu lấy tên tuỳ chỉnh thì đặt tên "Kỳ thủ B" một lần là nhãn của model đó bị đổi
+        # vĩnh viễn, và bảng xếp hạng không còn biết đang xếp hạng model nào.
+        self.ensure_player(red["model_key"], red.get("label") or red["model_key"],
+                           red.get("provider"))
+        self.ensure_player(black["model_key"], black.get("label") or black["model_key"],
                            black.get("provider"))
 
         connection = self._connect()

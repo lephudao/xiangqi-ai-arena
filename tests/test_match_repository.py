@@ -221,3 +221,23 @@ def test_referee_records_result_and_elo_on_finish(repo):
     assert match["ended_at"] is not None
     if match["status"] != "draw":
         assert repo.leaderboard(), "trận kết thúc đúng luật phải vào bảng xếp hạng"
+
+
+def test_leaderboard_label_comes_from_model_not_custom_name(repo):
+    """
+    Nhãn bảng xếp hạng phải là tên model, không phải tên tuỳ chỉnh của một trận.
+
+    Nếu lấy tên tuỳ chỉnh thì đặt tên "Kỳ thủ B" một lần là nhãn của model đó bị đổi vĩnh
+    viễn, và bảng xếp hạng không còn biết đang xếp hạng model nào.
+    """
+    match_id = repo.create_match(
+        {"model_key": "mock", "name": "Kỳ thủ B", "label": "Mock (đi ngẫu nhiên)"},
+        {"model_key": "claude-haiku-4-5", "name": "Đối thủ", "label": "Claude Haiku 4.5"},
+        "fen-dau")
+    repo.finish_match(match_id, _state("red_win", 'w'), _stats())
+
+    labels = {row["model_key"]: row["label"] for row in repo.leaderboard()}
+    assert labels["mock"] == "Mock (đi ngẫu nhiên)"
+    assert labels["claude-haiku-4-5"] == "Claude Haiku 4.5"
+    # Tên tuỳ chỉnh vẫn được giữ trong bản ghi trận
+    assert repo.get_match(match_id)["red_name"] == "Kỳ thủ B"
