@@ -59,6 +59,31 @@ nghĩa. Pyodide đắt hơn (~10MB tải lần đầu) nhưng loại bỏ hẳn 
 **Thứ tự bắt buộc:** 6.1 → 6.2 → 6.3 → 6.4. Không rút ngắn được vì mỗi phase là tiền đề của
 phase sau.
 
+## Bản local KHÔNG giảm chất lượng
+
+Câu hỏi đã đặt ra: chuyển sang kiến trúc chạy online thì bản local có kém đi không? **Không.**
+
+**Pikafish không bị thay.** Bản local giữ nguyên đúng binary đó, đúng file NNUE đó, đúng
+`PIKAFISH_MOVETIME_MS`. Fairy-Stockfish từng được nhắc chỉ là phương án cho bản online và
+**đã bỏ** — bản online không chấm điểm.
+
+**Luật cờ không bị viết lại.** Pyodide chạy chính các file `.py` hiện tại. Không tồn tại
+"phiên bản khác" nào để mà kém đi.
+
+**Tốc độ — đo thật, không phỏng đoán (2026-07-31):**
+
+| | CPython | Pyodide | Chênh |
+|---|---|---|---|
+| Sinh nước hợp lệ, khai cuộc | 0,37 ms | 0,64 ms | 1,7× |
+| Ván 300 nước, phần luật cờ | 0,91 ms/nước | 1,40 ms/nước | 1,5× |
+
+Cả hai cùng ra **44 nước hợp lệ** ở thế khai cuộc — đúng mốc kiểm chứng trong README.
+
+1,40 ms/nước so với **~5.400 ms/nước** độ trễ gọi LLM: chiếm 0,03%. Không quan sát được.
+Nạp Pyodide lần đầu ~1 giây (chưa tính tải mạng), import engine 12 ms.
+
+Kết luận: chi phí Pyodide nằm ở **lần nạp đầu tiên**, không nằm ở lúc đấu.
+
 ## Đã kiểm chứng (2026-07-31)
 
 ### Cả 5 nhà cung cấp cho trình duyệt gọi thẳng
