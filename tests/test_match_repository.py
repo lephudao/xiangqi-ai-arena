@@ -205,16 +205,21 @@ def test_referee_records_match_automatically(repo):
     assert moves[1]["fen_after"] == referee.board.to_fen()
 
 
-def test_referee_records_result_and_elo_on_finish(repo):
+def test_referee_records_result_and_elo_on_finish(repo, monkeypatch):
     """Trận kết thúc đúng luật -> ghi kết quả và cập nhật Elo."""
+    from engine.providers import MoveDecision
+
     referee = MatchReferee({"model_key": "mock", "name": "Đỏ"},
                            {"model_key": "mock", "name": "Đen"}, analysis_engine=None)
     match_id = referee.attach_recorder(repo)
-    # Thế Đen sắp bị chiếu bí: Đỏ đi là kết thúc luôn
-    referee.board.load_fen("3k5/9/9/9/9/3RR4/9/9/9/4K4 w - - 0 1")
-    for _ in range(6):
-        if referee.step()["game_over"]:
-            break
+
+    # Chiếu bí cưỡng bức: Đen trơ tướng ở e9, xe i8 khống chế hàng 8, xe a1 lên a9 là bí.
+    # Không dùng thế cờ để Mock đi ngẫu nhiên tự tìm ra chiếu bí — cách đó chỉ kết thúc
+    # khoảng 90% số lần và làm test đỏ tuỳ theo thứ tự chạy.
+    referee.board.load_fen("4k4/8R/9/9/9/9/9/9/R8/3K5 w - - 0 1")
+    monkeypatch.setattr(referee.red_agent, "decide",
+                        lambda *args, **kwargs: MoveDecision(move_ucci="a1a9"))
+    referee.step()
 
     match = repo.get_match(match_id)
     assert match["status"] in ("red_win", "black_win", "draw")

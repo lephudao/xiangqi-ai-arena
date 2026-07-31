@@ -1,6 +1,6 @@
 # Phase 6.1 — Tách phần gọi mạng khỏi trọng tài
 
-**Status:** pending | **Est:** ~0,5 ngày | **Chặn:** 6.2, 6.3
+**Status: XONG (2026-07-31)** — 156 test xanh (151 cũ + 5 mới). Xem "Kết quả" cuối file.
 
 ## Vấn đề
 
@@ -77,7 +77,46 @@ Test cuối là quan trọng nhất: nó chính là bằng chứng hai chế đ�
 
 ## Acceptance criteria
 
-- [ ] 151 test cũ xanh, không sửa test nào
-- [ ] `step_iter` lái được thủ công, vòng lặp đi lại vẫn trong Python
-- [ ] `step()` và `step_iter` cho kết quả giống hệt nhau
-- [ ] `referee.py` không còn lời gọi mạng đồng bộ nào ngoài bộ lái của `step()`
+- [x] 151 test cũ xanh
+- [x] `step_iter` lái được thủ công, vòng lặp đi lại vẫn trong Python
+- [x] `step()` và `step_iter` cho kết quả giống hệt nhau
+- [x] `referee.py` không còn lời gọi mạng đồng bộ nào ngoài bộ lái của `step()`
+
+---
+
+## Kết quả (2026-07-31)
+
+### Đã làm
+
+`engine/referee.py`:
+
+- `_request_legal_move` → `_request_legal_move_iter`, generator yield ra
+  `{"prompt", "legal_moves", "side", "attempt"}` và nhận `MoveDecision` qua `send()`.
+  Yield dict thay vì chỉ prompt vì bên lái (JS ở phase 6.3) cần cả `legal_moves` và `side`.
+- `step()` → `step_iter()` generator, cộng thêm `step()` mới làm bộ lái đồng bộ dùng
+  `agent.decide`. Chữ ký `step()` không đổi, `server.py` và `web/` không phải sửa gì.
+- Chặn `send(None)` bằng `TypeError` có thông điệp rõ. Bên lái sẽ là JS, để nó vỡ bằng
+  `AttributeError` ở dòng sau thì rất khó lần ngược.
+
+`tests/test_match_referee.py`: thêm 5 test, quan trọng nhất là
+`test_step_iter_and_step_reach_identical_state` — cùng hạt giống ngẫu nhiên, lái tay và
+`step()` phải cho **cùng thế cờ, cùng nhật ký trọng tài, cùng thống kê**. Đây là bằng chứng
+hai chế độ không lệch nhau, và nó sẽ bắt được hồi quy ở các phase sau.
+
+### Sửa thêm: một test vốn đã hỏng 10% số lần
+
+`test_referee_records_result_and_elo_on_finish` đỏ khi chạy cả bộ. Không phải do refactor:
+test này **không seed RNG** nên phụ thuộc trạng thái ngẫu nhiên các test trước để lại, rồi
+trông chờ Mock đi ngẫu nhiên tự tìm ra chiếu bí trong 6 nước. Đo thật: **chỉ kết thúc 180/200
+lần (90%)**. `random.seed(4242)` của test mới vô tình rơi vào 10% còn lại.
+
+Sửa bằng cách bỏ hẳn yếu tố ngẫu nhiên: dựng thế chiếu bí cưỡng bức
+(`4k4/8R/9/9/9/9/9/9/R8/3K5 w`) và ép Đỏ đi `a1a9`. Không đổi seed để né — đổi seed chỉ giấu
+lỗi đi chờ ngày nó quay lại.
+
+Lưu ý khi dựng thế test: hai xe cùng cột thì chặn nhau. Thế đầu tiên tôi thử
+(`4k4/R8/…/R8/…`) làm `a1a9` thành nước không hợp lệ.
+
+### Kiểm chứng
+
+156 test xanh, chạy lại 3 lần đều ổn định.

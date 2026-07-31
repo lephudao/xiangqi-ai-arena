@@ -194,8 +194,21 @@ class MatchReferee:
 
     # --- Vòng đời trận đấu ---
 
-    def step(self):
-        """Chạy một lượt của trận đấu. Trả về state dict."""
+    def step_iter(self):
+        """
+        Chạy một lượt dưới dạng generator: yield ra yêu cầu nước đi, nhận vào MoveDecision
+        qua ``send()``. Kết thúc bằng StopIteration mang theo state dict.
+
+        Mỗi lần yield trả về dict ``{"prompt", "legal_moves", "side", "attempt"}``.
+
+        Tồn tại để tách phần GỌI MẠNG ra khỏi trọng tài mà không phải bê vòng lặp đi lại ra
+        ngoài. Vòng lặp đó chứa đếm số lần sai luật, dựng lý do từ chối và ghi nhật ký —
+        nhân bản nó sang môi trường khác là cách chắc chắn nhất để hai môi trường báo số
+        liệu vi phạm khác nhau.
+
+        Bên gọi đồng bộ dùng ``step()``. Bên gọi bất đồng bộ (trình duyệt qua Pyodide) tự lái
+        generator này và await lời gọi mạng giữa hai bước.
+        """
         if self.game_over:
             return self.get_state()
 
@@ -213,7 +226,7 @@ class MatchReferee:
             return self.get_state()
 
         legal_moves = self.board.generate_legal_moves(side)
-        decision, attempts = self._request_legal_move(side, legal_moves)
+        decision, attempts = yield from self._request_legal_move_iter(side, legal_moves)
 
         chosen_move = decision.move_ucci
         referee_override = None
@@ -228,6 +241,21 @@ class MatchReferee:
             )
 
         return self._apply_move(side, chosen_move, decision, attempts, referee_override)
+
+    def step(self):
+        """Chạy một lượt của trận đấu. Trả về state dict."""
+        moves = self.step_iter()
+        try:
+            request = next(moves)
+            while True:
+                agent = self._agent(request["side"])
+                decision = agent.decide(
+                    request["prompt"], request["legal_moves"],
+                    board=self.board, side=request["side"],
+                )
+                request = moves.send(decision)
+        except StopIteration as finished:
+            return finished.value
 
     def _is_human_turn(self, side=None):
         side = side or self.board.turn
@@ -348,11 +376,13 @@ class MatchReferee:
 
         return self.get_state()
 
-    def _request_legal_move(self, side, legal_moves):
+    def _request_legal_move_iter(self, side, legal_moves):
         """
         Xin nước đi, cho đi lại kèm lý do khi sai. Trả (decision cuối, danh sách nước đã thử).
+
+        Generator: yield ra yêu cầu, nhận vào MoveDecision. Bên gọi quyết định lấy nước đi
+        bằng cách nào — SDK đồng bộ ở máy chủ hay fetch bất đồng bộ ở trình duyệt.
         """
-        agent = self._agent(side)
         attempts = []
         feedback = None
         decision = None
@@ -364,7 +394,18 @@ class MatchReferee:
                 self.board, side, legal_moves, self._player_name(side),
                 move_logs=self.move_logs, feedback=feedback,
             )
-            decision = agent.decide(prompt, legal_moves, board=self.board, side=side)
+            decision = yield {
+                "prompt": prompt,
+                "legal_moves": legal_moves,
+                "side": side,
+                "attempt": attempt_index + 1,
+            }
+            if decision is None:
+                # Chỉ xảy ra khi bên lái generator gửi sai. Báo thẳng thay vì để vỡ bằng
+                # AttributeError ở dòng dưới, vì bên lái có thể là JS và rất khó lần ngược.
+                raise TypeError(
+                    "step_iter cần nhận MoveDecision qua send(); nhận được None"
+                )
             self._record_usage(side, decision)
 
             if decision.error:

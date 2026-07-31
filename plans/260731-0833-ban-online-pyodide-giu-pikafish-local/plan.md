@@ -116,8 +116,17 @@ chính để giữ bản local.
 | Tên header `anthropic-dangerous-direct-browser-access` làm người dùng lo | Nói thẳng trong giao diện: key nằm ở trình duyệt của chính họ |
 | Người dùng hết tiền vì bấm nhầm | Hiện chi phí luỹ kế theo thời gian thực; có giới hạn số nước |
 
+## Quyết định phạm vi (2026-07-31)
+
+| Hạng mục | Quyết định | Hệ quả |
+|---|---|---|
+| Người vs AI trên bản online | **Có** | `submit_human_move` phải chạy trong Pyodide. **Không có nút 💡 Gợi Ý** — gợi ý cần Pikafish, chỉ bản local mới có |
+| Xem lại (replay) trên bản online | **Không** | Bỏ hẳn IndexedDB lưu nước đi ở phase 6.4 — nhẹ đi đáng kể |
+| Nạp Pyodide | **Tự host trong repo** | Không lệ thuộc CDN, chạy được cả khi offline. Repo nặng thêm ~10MB, `web/vendor/` không gitignore phần Pyodide |
+
 ## Câu hỏi chưa giải quyết
 
-1. Bản online có cần chế độ Người vs AI không, hay chỉ AI vs AI cho gọn?
-2. Bản online có cần xem lại (replay) từ IndexedDB không, hay bỏ luôn?
-3. Repo công khai ngay hay chờ quay xong loạt video đầu?
+1. Bỏ xem lại rồi thì bản online có giữ bảng xếp hạng Elo trong `localStorage` không?
+   Đề xuất: **có**, chỉ lưu kết quả trận (thắng/thua/hoà + model), không lưu nước đi — rẻ và
+   vẫn cho người xem thấy "AI nào mạnh hơn". Quyết ở phase 6.4, chưa chặn gì.
+2. Repo công khai ngay hay chờ quay xong loạt video đầu?

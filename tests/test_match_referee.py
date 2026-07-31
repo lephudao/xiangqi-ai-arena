@@ -193,3 +193,96 @@ def test_referee_accepts_config_without_name():
     state = referee.step()
     assert state["red_config"]["name"]
     assert state["last_move"]["player"]
+
+
+# --- step_iter: lái trọng tài từ bên ngoài ---
+#
+# Trình duyệt không gọi mạng đồng bộ được, nên phải tự lái vòng lượt và await lời gọi API
+# giữa hai bước. Các test dưới đây kiểm rằng lái tay cho kết quả y hệt step().
+
+
+def _drive(referee, decide):
+    """Lái step_iter bằng tay, giống cách JS sẽ làm. Trả state dict cuối lượt."""
+    turn = referee.step_iter()
+    try:
+        request = next(turn)
+        while True:
+            request = turn.send(decide(request))
+    except StopIteration as finished:
+        return finished.value
+
+
+def test_step_iter_counts_illegal_attempts_like_step():
+    """Vòng lặp đi lại phải nằm trong Python, bên lái chỉ cung cấp nước đi."""
+    referee = _mock_referee()
+    prompts = []
+
+    def decide(request):
+        prompts.append(request["prompt"])
+        if request["attempt"] < 3:
+            return MoveDecision(move_ucci="a0a9", taunt="nước sai luật")
+        return MoveDecision(move_ucci=request["legal_moves"][0], taunt="đi lại đúng luật")
+
+    state = _drive(referee, decide)
+
+    assert referee.stats['w']["illegal_attempts"] == 2
+    assert [p for p in prompts if "BỊ TRỌNG TÀI TỪ CHỐI" in p], "phải kèm lý do bị từ chối"
+    assert state["last_move"]["referee_override"] is None
+    assert state["last_move"]["attempts"] == ["a0a9", "a0a9", state["last_move"]["ucci"]]
+
+
+def test_step_iter_lets_referee_pick_when_ai_keeps_failing():
+    referee = _mock_referee()
+    state = _drive(referee, lambda request: MoveDecision(move_ucci="zzzz"))
+
+    assert referee.stats['w']["illegal_attempts"] == 3
+    assert state["last_move"]["referee_override"] is not None
+
+
+def test_step_iter_yields_nothing_when_no_ai_turn_is_needed():
+    """Trận đã kết thúc thì không được hỏi AI — tốn tiền vô ích."""
+    referee = _mock_referee()
+    referee.board.load_fen("3k5/9/9/9/9/9/9/9/9/4K4 w - - 120 61")
+    asked = []
+
+    state = _drive(referee, lambda request: asked.append(request))
+
+    assert asked == [], "trận hoà rồi mà vẫn gọi API là lỗi"
+    assert state["game_over"]
+
+
+def test_step_iter_rejects_missing_decision():
+    """Bên lái là JS thì gửi sai rất dễ; phải báo rõ thay vì vỡ bằng AttributeError."""
+    import pytest
+
+    referee = _mock_referee()
+    with pytest.raises(TypeError, match="MoveDecision"):
+        _drive(referee, lambda request: None)
+
+
+def test_step_iter_and_step_reach_identical_state():
+    """
+    Bằng chứng hai chế độ không lệch nhau: cùng hạt giống ngẫu nhiên, lái tay và step()
+    phải cho cùng thế cờ, cùng nhật ký, cùng thống kê.
+    """
+    def run(use_step_iter):
+        random.seed(4242)
+        referee = _mock_referee()
+        for _ in range(40):
+            if use_step_iter:
+                state = _drive(referee, lambda request: referee._agent(request["side"]).decide(
+                    request["prompt"], request["legal_moves"],
+                    board=referee.board, side=request["side"],
+                ))
+            else:
+                state = referee.step()
+            if state["game_over"]:
+                break
+        return referee
+
+    by_step, by_iter = run(False), run(True)
+
+    assert by_iter.board.to_fen() == by_step.board.to_fen()
+    assert by_iter.referee_log == by_step.referee_log
+    assert by_iter.stats == by_step.stats
+    assert [m["ucci"] for m in by_iter.move_logs] == [m["ucci"] for m in by_step.move_logs]
