@@ -25,21 +25,34 @@ DEFAULT_RED_CONFIG = {"name": "Kỳ thủ Đỏ", "model_key": "mock"}
 DEFAULT_BLACK_CONFIG = {"name": "Kỳ thủ Đen", "model_key": "mock"}
 
 
-def normalize_config(config, fallback_name):
+def split_config_and_secret(config, fallback_name):
     """
-    Điền các trường thiếu trong cấu hình kỳ thủ.
+    Tách cấu hình kỳ thủ thành phần công khai và API key bí mật.
+
+    Trả (cấu hình công khai, api_key).
+
+    API KEY KHÔNG ĐƯỢC nằm trong cấu hình công khai: cấu hình này được trả lại nguyên vẹn
+    trong mọi phản hồi /api/state, nên để key ở đó là phát tán key cho bất kỳ ai đọc được
+    trạng thái trận. Đây là điều kiện bắt buộc để người dùng dám nhập key của họ.
 
     Client chỉ cần gửi model_key; tên hiển thị tự lấy từ nhãn model trong danh mục để
-    API không vỡ khi thiếu trường (trước đây thiếu "name" là KeyError làm sập /api/reset).
+    API không vỡ khi thiếu trường.
     """
     from engine.model_registry import get_model
 
     config = dict(config or {})
+    api_key = config.pop("api_key", None)
     config.setdefault("model_key", "mock")
     if not config.get("name"):
         model = get_model(config["model_key"])
         config["name"] = model.label if model else fallback_name
-    return config
+    return config, api_key
+
+
+def normalize_config(config, fallback_name):
+    """Giữ lại cho các nơi chỉ cần phần công khai."""
+    public_config, _ = split_config_and_secret(config, fallback_name)
+    return public_config
 
 RESULT_MESSAGES_VI = {
     "checkmate": "CHIẾU BÍ",
@@ -92,8 +105,11 @@ class MatchReferee:
         return self.record_id
 
     def __init__(self, red_config=None, black_config=None, analysis_engine=AUTO_ANALYSIS_ENGINE):
-        self.red_config = normalize_config(red_config or DEFAULT_RED_CONFIG, "Kỳ thủ Đỏ")
-        self.black_config = normalize_config(black_config or DEFAULT_BLACK_CONFIG, "Kỳ thủ Đen")
+        # Key giữ riêng, không bao giờ đi vào cấu hình công khai hay cơ sở dữ liệu
+        self._api_keys = {}
+        self.red_config = self._set_side_config('w', red_config or DEFAULT_RED_CONFIG, "Kỳ thủ Đỏ")
+        self.black_config = self._set_side_config('b', black_config or DEFAULT_BLACK_CONFIG,
+                                                  "Kỳ thủ Đen")
         # Engine chấm điểm dùng chung cho cả trận. Thiếu engine -> chỉ mất phần chấm điểm,
         # trận vẫn chạy bình thường.
         self.analysis_engine = (
@@ -104,11 +120,18 @@ class MatchReferee:
             f"{self.black_config['name']} chính thức BẮT ĐẦU!"
         )
 
-    def _build_agent(self, config):
+    def _set_side_config(self, side, config, fallback_name):
+        """Đặt cấu hình cho một bên, cất API key vào kho riêng."""
+        public_config, api_key = split_config_and_secret(config, fallback_name)
+        if api_key:
+            self._api_keys[side] = api_key
+        return public_config
+
+    def _build_agent(self, config, side):
         """Tạo kỳ thủ từ cấu hình; ghi log nếu phải thay thế (ví dụ thiếu API key)."""
         provider, note = create_provider(
             config.get("model_key", "mock"),
-            api_key=config.get("api_key"),
+            api_key=self._api_keys.get(side),
             effort=config.get("effort"),
             analysis_engine=self.analysis_engine,
         )
@@ -121,8 +144,8 @@ class MatchReferee:
         # Ghi chú phát sinh khi tạo kỳ thủ (thiếu API key, model không tồn tại...) —
         # thu ở đây rồi đưa vào log mở đầu để người xem biết ai là AI thật, ai là Mock.
         self._pending_notes = []
-        self.red_agent = self._build_agent(self.red_config)
-        self.black_agent = self._build_agent(self.black_config)
+        self.red_agent = self._build_agent(self.red_config, 'w')
+        self.black_agent = self._build_agent(self.black_config, 'b')
 
         self.game_over = False
         self.winner = None            # tên người thắng, None nếu hoà/đang đấu
@@ -141,9 +164,9 @@ class MatchReferee:
 
     def reset(self, red_config=None, black_config=None):
         if red_config:
-            self.red_config = normalize_config(red_config, "Kỳ thủ Đỏ")
+            self.red_config = self._set_side_config('w', red_config, "Kỳ thủ Đỏ")
         if black_config:
-            self.black_config = normalize_config(black_config, "Kỳ thủ Đen")
+            self.black_config = self._set_side_config('b', black_config, "Kỳ thủ Đen")
 
         # Giữ lại kho lưu trữ qua các lần lập lại, nhưng mở BẢN GHI MỚI: đây là một trận
         # khác, không được ghi tiếp vào bản ghi của trận cũ.
