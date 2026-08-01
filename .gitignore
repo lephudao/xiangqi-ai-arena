@@ -7,3 +7,8 @@ __pycache__/
 engine/bin/
 data/
 .DS_Store
+
+# Sinh ra bằng scripts/install-pyodide.sh và scripts/build-web-bundle.sh.
+# Không commit: pyodide.asm.wasm gần 10MB là blob nhị phân, mỗi lần nâng phiên bản sẽ nằm
+# lại vĩnh viễn trong lịch sử git. run.sh tự dựng lại cả hai.
+web/vendor/

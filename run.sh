@@ -25,6 +25,13 @@ source venv/bin/activate
 echo "📥 Installing dependencies..."
 pip install --quiet -r requirements.txt
 
+# Pyodide: chỉ tải lần đầu (script tự bỏ qua nếu đã có)
+./scripts/install-pyodide.sh
+
+# Dựng lại bundle mỗi lần chạy. Nếu không, sửa Python xong mà trình duyệt vẫn nạp bundle cũ
+# thì hai bên lệch nhau và rất khó lần ra nguyên nhân.
+./scripts/build-web-bundle.sh
+
 # Run server
 echo "🚀 Launching Xiangqi Studio Server on http://localhost:5000..."
 python3 server.py

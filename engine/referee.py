@@ -6,7 +6,7 @@ tối đa MAX_MOVE_ATTEMPTS lần kèm lý do cụ thể, đếm số lần sai,
 hoàn toàn không đưa được nước hợp lệ.
 """
 
-from engine.analysis import PikafishEngine, average_accuracy, score_move
+from engine.analysis import average_accuracy, score_move
 from engine.prompt_builder import build_move_prompt
 from engine.providers import MoveDecision, create_provider
 from engine.xiangqi import STATUS_DRAW, STATUS_ONGOING, XiangqiBoard
@@ -116,9 +116,12 @@ class MatchReferee:
                                                   "Kỳ thủ Đen")
         # Engine chấm điểm dùng chung cho cả trận. Thiếu engine -> chỉ mất phần chấm điểm,
         # trận vẫn chạy bình thường.
-        self.analysis_engine = (
-            PikafishEngine() if analysis_engine is AUTO_ANALYSIS_ENGINE else analysis_engine
-        )
+        # Nhập trong hàm: Pikafish cần subprocess nên không tồn tại trong trình duyệt, mà
+        # trọng tài thì phải chạy được ở cả hai nơi.
+        if analysis_engine is AUTO_ANALYSIS_ENGINE:
+            from engine.analysis import PikafishEngine
+            analysis_engine = PikafishEngine()
+        self.analysis_engine = analysis_engine
         self._start_new_game(
             f"Trọng tài: Trận đấu giữa {self.red_config['name']} và "
             f"{self.black_config['name']} chính thức BẮT ĐẦU!"

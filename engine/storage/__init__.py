@@ -7,9 +7,22 @@ from engine.storage.elo_rating import (
     score_from_result,
     update_ratings,
 )
-from engine.storage.match_repository import DEFAULT_DB_PATH, MatchRepository
-
 __all__ = [
     "MatchRepository", "DEFAULT_DB_PATH",
     "STARTING_ELO", "K_FACTOR", "expected_score", "update_ratings", "score_from_result",
 ]
+
+_SQLITE_NAMES = {"MatchRepository", "DEFAULT_DB_PATH"}
+
+
+def __getattr__(name):
+    """
+    Nạp lười phần dùng SQLite.
+
+    Bản online không lưu nước đi (không có chức năng xem lại), chỉ cần công thức Elo để
+    giữ bảng xếp hạng trong localStorage. Nạp lười để bundle web khỏi kèm tầng SQLite.
+    """
+    if name in _SQLITE_NAMES:
+        from engine.storage import match_repository
+        return getattr(match_repository, name)
+    raise AttributeError(f"module {__name__!r} không có thuộc tính {name!r}")
