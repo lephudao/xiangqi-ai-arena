@@ -10,7 +10,7 @@ Lớp này là GLUE, không chứa luật cờ. Mọi quyết định về luậ
 `xiangqi/` — chạy y hệt nhau ở máy chủ lẫn trình duyệt.
 """
 
-from engine.model_registry import ALL_MODELS, estimate_cost_usd, get_model
+from engine.model_registry import ALL_MODELS, TTS_MODELS, estimate_cost_usd, get_model
 from engine.storage.elo_rating import STARTING_ELO, score_from_result, update_ratings
 from engine.providers import MoveDecision
 from engine.providers.base_provider import MOVE_SCHEMA
@@ -200,6 +200,30 @@ def describe_models():
             for model in ALL_MODELS
         ],
     }
+
+
+def describe_tts_models():
+    """
+    Danh mục giọng đọc cho phía JS.
+
+    Tách khỏi `describe_models()` vì đây không phải kỳ thủ — để lẫn vào thì người dùng sẽ
+    thấy "Gemini TTS" trong danh sách chọn đối thủ đánh cờ.
+    """
+    return [
+        {
+            "key": model.key,
+            "label": model.label,
+            "model_id": model.model_id,
+            "api_key_env": model.api_key_env,
+            "note": model.note,
+        }
+        for model in TTS_MODELS
+    ]
+
+
+def tts_cost_usd(model_key, tokens_in, tokens_out):
+    """Chi phí một lần đọc. Trả None nếu chưa có giá — giao diện hiện '—' thay vì số bịa."""
+    return estimate_cost_usd(model_key, tokens_in, tokens_out)
 
 
 def decision_from_payload(payload):

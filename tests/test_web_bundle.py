@@ -16,6 +16,8 @@ from engine.browser_bridge import (
     apply_elo,
     decision_from_payload,
     describe_models,
+    describe_tts_models,
+    tts_cost_usd,
 )
 from engine.providers.external_provider import ExternalProvider
 from engine.storage.elo_rating import STARTING_ELO
@@ -168,6 +170,35 @@ def test_model_catalog_carries_what_javascript_needs_to_build_requests():
     schema = describe_models()["move_schema"]
     assert schema["properties"]["move_ucci"]["type"] == "string", \
         "move_ucci phải là string tự do, ép enum sẽ mất tín hiệu AI đọc được bàn cờ hay không"
+
+
+# --- Giọng đọc (TTS) ---
+
+def test_tts_models_are_not_offered_as_chess_players():
+    """Model TTS không đánh cờ. Lọt vào danh sách kỳ thủ là người dùng chọn được nó làm đối thủ."""
+    player_keys = {model["key"] for model in describe_models()["models"]}
+    tts_keys = {model["key"] for model in describe_tts_models()}
+
+    assert tts_keys, "phải có ít nhất một giọng đọc"
+    assert not (player_keys & tts_keys)
+
+
+def test_tts_cost_comes_from_the_price_table():
+    """
+    Tiếng đọc tốn tiền theo token âm thanh, và giá chênh nhau 2 lần giữa các model.
+    Bỏ qua thì bộ đếm báo thiếu so với hoá đơn thật.
+    """
+    # Gemini 2.5 Flash TTS: $0.50 vào + $10.00 ra cho 1 triệu token
+    assert tts_cost_usd("gemini-2.5-flash-tts", 1_000_000, 1_000_000) == pytest.approx(10.50)
+    # Bản 3.1 đắt gấp đôi
+    assert tts_cost_usd("gemini-3.1-flash-tts", 1_000_000, 1_000_000) == pytest.approx(21.00)
+    assert tts_cost_usd("khong-ton-tai", 1000, 1000) is None
+
+
+def test_tts_catalog_gives_javascript_what_it_needs():
+    by_key = {model["key"]: model for model in describe_tts_models()}
+    assert by_key["gemini-2.5-flash-tts"]["model_id"] == "gemini-2.5-flash-preview-tts"
+    assert by_key["gemini-2.5-flash-tts"]["api_key_env"] == "GEMINI_API_KEY"
 
 
 # --- Bảng xếp hạng Elo của bản online ---

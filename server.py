@@ -144,11 +144,14 @@ def delete_match(match_id):
 @app.route("/api/models", methods=["GET"])
 def get_models():
     """Danh mục kỳ thủ cho dropdown — UI không hardcode model nữa."""
+    from engine.browser_bridge import describe_tts_models
     from engine.model_registry import DEFAULT_BLACK_MODEL, DEFAULT_RED_MODEL, list_models
     return jsonify({
         "models": list_models(),
         "default_red": DEFAULT_RED_MODEL,
         "default_black": DEFAULT_BLACK_MODEL,
+        # Giọng đọc gọi thẳng từ trình duyệt; máy chủ chỉ cung cấp danh mục và bảng giá
+        "tts_models": describe_tts_models(),
     })
 
 

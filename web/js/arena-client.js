@@ -67,6 +67,11 @@ class ServerArena {
         const { leaderboard } = await (await fetch("/api/leaderboard")).json();
         return leaderboard;
     }
+
+    async listTtsModels() {
+        const { tts_models: models } = await (await fetch("/api/models")).json();
+        return models ?? [];
+    }
 }
 
 /** Chế độ Online: Pyodide + trình duyệt tự gọi API AI bằng key người dùng. */
@@ -139,6 +144,10 @@ class BrowserArena {
 
     async leaderboard() {
         return loadBoard();
+    }
+
+    async listTtsModels() {
+        return runtime.describeTtsModels();
     }
 }
 

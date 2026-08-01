@@ -100,8 +100,26 @@ _BASELINES = [
               note="Mốc trần: engine cờ tướng chuyên dụng, chạy local miễn phí"),
 ]
 
+# Model đọc tiếng (TTS). KHÔNG nằm trong ALL_MODELS: chúng không đánh cờ nên không được
+# xuất hiện trong danh sách chọn kỳ thủ. Nhưng vẫn vào _BY_KEY để estimate_cost_usd tra được
+# giá — tiếng đọc cũng tốn tiền và phải hiện trong bộ đếm chi phí.
+#
+# Giá lấy từ ai.google.dev/gemini-api/docs/pricing ngày 2026-08-01, bậc trả phí tiêu chuẩn.
+# Bậc miễn phí của Google cho TTS là $0, nhưng bộ đếm dùng giá trả phí để không báo thiếu.
+TTS_MODELS = [
+    ModelInfo("gemini-2.5-flash-tts", "Gemini 2.5 Flash TTS", "gemini_tts",
+              "gemini-2.5-flash-preview-tts", 0.50, 10.00, api_key_env="GEMINI_API_KEY",
+              note="Rẻ nhất; đủ tốt cho lời bình trận đấu"),
+    ModelInfo("gemini-3.1-flash-tts", "Gemini 3.1 Flash TTS", "gemini_tts",
+              "gemini-3.1-flash-tts-preview", 1.00, 20.00, api_key_env="GEMINI_API_KEY",
+              note="Mới nhất; đắt gấp đôi bản 2.5 Flash"),
+    ModelInfo("gemini-2.5-pro-tts", "Gemini 2.5 Pro TTS", "gemini_tts",
+              "gemini-2.5-pro-preview-tts", 1.00, 20.00, api_key_env="GEMINI_API_KEY",
+              note="Không có bậc miễn phí"),
+]
+
 ALL_MODELS = _ANTHROPIC + _GEMINI + _OPENAI_COMPATIBLE + _BASELINES
-_BY_KEY = {model.key: model for model in ALL_MODELS}
+_BY_KEY = {model.key: model for model in ALL_MODELS + TTS_MODELS}
 
 DEFAULT_RED_MODEL = "claude-haiku-4-5"
 # Flash cùng phân khúc giá/tốc độ với Haiku 4.5 -> cặp đấu công bằng

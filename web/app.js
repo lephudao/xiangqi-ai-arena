@@ -7,6 +7,8 @@ import { renderBoardGrid, renderPieces } from './js/board-renderer.js';
 import { ReplayController } from './js/replay-controller.js';
 import { HumanInput } from './js/human-input.js';
 import { createArenaClient } from './js/arena-client.js';
+import * as geminiTts from './js/gemini-tts.js';
+import { VOICES as TTS_VOICES } from './js/gemini-tts.js';
 
 let currentState = null;
 let isAutoPlaying = false;
@@ -28,6 +30,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     applyCapabilities(arena.capabilities);
 
     await loadModels();
+    ttsModels = await arena.listTtsModels();
+    setupTts();
     fetchState();
 
     // Event Listeners
@@ -62,7 +66,7 @@ async function submitHumanMove(ucci) {
         }
         playPieceSound();
         updateUI(data);
-        if (document.getElementById('chk-tts').checked && data.last_move) speakMove(data.last_move);
+        if (data.last_move) speakMove(data.last_move);
         if (data.game_over) return showResultBanner(data);
 
         // Đi xong thì để AI đáp lại ngay, người chơi không phải bấm thêm nút
@@ -366,9 +370,7 @@ async function handleStep() {
         updateUI(data);
 
         // TTS Speech synthesis if enabled
-        if (data.last_move && document.getElementById('chk-tts').checked) {
-            speakMove(data.last_move);
-        }
+        if (data.last_move) speakMove(data.last_move);
 
         if (data.game_over) {
             stopAutoPlay();
@@ -689,18 +691,105 @@ function updateAnalysisWarning(state) {
 }
 
 // Web Speech Synthesis (TTS) — đọc ký hiệu cờ tướng ("Pháo 2 bình 5") rồi tới lời bình
+// ===== Đọc lời bình =====
+
+let ttsModels = [];
+
+function ttsMode() {
+    return document.getElementById('sel-tts-mode').value;
+}
+
+const TTS_MODE_KEY = 'xiangqi-arena.tts-mode';
+
+/**
+ * Dựng phần chọn giọng đọc.
+ *
+ * Chế độ được đặt TƯỜNG MINH từ localStorage, mặc định Web Speech (miễn phí). Không dựa vào
+ * thuộc tính `selected` trong HTML: Chrome khôi phục giá trị select giữa các tab cùng origin,
+ * nên trang mới mở có thể tự nhảy sang Gemini — tức là tự bật một lựa chọn TỐN TIỀN mà người
+ * dùng không hề chọn.
+ */
+function setupTts() {
+    const modeSelect = document.getElementById('sel-tts-mode');
+    const options = document.getElementById('tts-gemini-options');
+    const modelSelect = document.getElementById('sel-tts-model');
+    const voiceSelect = document.getElementById('sel-tts-voice');
+
+    ttsModels.forEach(model => {
+        modelSelect.add(new Option(model.label, model.key));
+    });
+    TTS_VOICES.forEach(voice => voiceSelect.add(new Option(voice, voice)));
+    modelSelect.value = 'gemini-2.5-flash-tts';   // rẻ nhất, đủ tốt cho lời bình
+
+    const saved = localStorage.getItem(TTS_MODE_KEY);
+    modeSelect.value = ['web', 'gemini', 'off'].includes(saved) ? saved : 'web';
+
+    const syncVisibility = () => { options.hidden = modeSelect.value !== 'gemini'; };
+    modeSelect.addEventListener('change', () => {
+        localStorage.setItem(TTS_MODE_KEY, modeSelect.value);
+        syncVisibility();
+        if (modeSelect.value === 'gemini' && !geminiTts.isAvailable()) {
+            document.getElementById('referee-text').textContent =
+                'Chưa có API key Gemini — sẽ tự đọc bằng Web Speech cho tới khi bạn nhập key.';
+        }
+    });
+    syncVisibility();
+}
+
 function speakMove(lastMove) {
-    if (!synth) return;
+    const mode = ttsMode();
+    if (mode === 'off') return;
+
     const parts = [];
     if (lastMove.vi_text) parts.push(lastMove.vi_text);
     if (lastMove.reasoning) parts.push(lastMove.reasoning);
     if (parts.length === 0) return;
+    const text = parts.join('. ');
 
+    if (mode === 'web' || !geminiTts.isAvailable()) return speakWithWebSpeech(text);
+    speakWithGemini(text);
+}
+
+function speakWithWebSpeech(text) {
+    if (!synth) return;
     synth.cancel(); // dừng câu trước để không đọc dồn khi chạy tốc độ nhanh
-    const utterance = new SpeechSynthesisUtterance(parts.join('. '));
+    const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'vi-VN';
     utterance.rate = 1.0;
     synth.speak(utterance);
+}
+
+/**
+ * Đọc bằng Gemini, KHÔNG chặn nước tiếp theo.
+ *
+ * Trận cờ chạy song song với tiếng: chờ đọc xong mới đi tiếp sẽ cộng thêm vài giây mỗi nước.
+ * Lỗi gọi API thì tự chuyển về Web Speech và ghi chú, không được im lặng mất tiếng.
+ */
+function speakWithGemini(text) {
+    const model = ttsModels.find(m => m.key === document.getElementById('sel-tts-model').value);
+    if (!model) return speakWithWebSpeech(text);
+
+    geminiTts.speak(text, {
+        model,
+        voice: document.getElementById('sel-tts-voice').value,
+    }).then(result => {
+        if (result.skipped) return;   // đang đọc câu trước, bỏ qua câu này
+        if (!result.ok) {
+            document.getElementById('referee-text').textContent =
+                `Giọng Gemini lỗi (${result.error}) — tạm đọc bằng Web Speech.`;
+            speakWithWebSpeech(text);
+            return;
+        }
+        updateTtsCost();
+    });
+}
+
+function updateTtsCost() {
+    const cost = geminiTts.sessionCostUsd();
+    const element = document.getElementById('tts-cost');
+    if (!element) return;
+    element.hidden = cost <= 0;
+    element.textContent = `+ đọc tiếng ${formatUsd(cost)}`;
 }
 
 // Web Audio API Synthetic Piece Sound

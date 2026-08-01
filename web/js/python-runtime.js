@@ -77,7 +77,7 @@ import os, sys
 _bundle_dir = os.getcwd()
 if _bundle_dir not in sys.path:
     sys.path.insert(0, _bundle_dir)
-from engine.browser_bridge import BrowserArena, apply_elo, describe_models
+from engine.browser_bridge import BrowserArena, apply_elo, describe_models, describe_tts_models
 `);
 
     onProgress({ phase: "ready" });
@@ -92,6 +92,12 @@ from engine.browser_bridge import BrowserArena, apply_elo, describe_models
 export function describeModels() {
     if (!pyodide) throw new Error("Chưa nạp xong Pyodide — gọi init() trước");
     return toJs(pyodide.globals.get("describe_models")());
+}
+
+/** Danh mục giọng đọc Gemini, kèm bảng giá để tính chi phí đọc tiếng. */
+export function describeTtsModels() {
+    if (!pyodide) throw new Error("Chưa nạp xong Pyodide — gọi init() trước");
+    return toJs(pyodide.globals.get("describe_tts_models")());
 }
 
 /**
