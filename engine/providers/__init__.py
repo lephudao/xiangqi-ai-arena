@@ -21,10 +21,14 @@ def _resolve_api_key(model_info, explicit_key=None):
     return ""
 
 
-def create_provider(model_key, api_key=None, effort=None, analysis_engine=None):
+def create_provider(model_key, api_key=None, effort=None, analysis_engine=None,
+                    external=False):
     """
     Tạo provider cho một kỳ thủ. Trả (provider, note) — note khác None khi phải thay thế
     provider được yêu cầu (ví dụ thiếu key).
+
+    `external=True`: bên gọi tự lo phần gọi API (bản chạy trong trình duyệt). Các kỳ thủ
+    dùng API sẽ thành ExternalProvider — trọng tài biết danh tính nhưng không gọi mạng.
     """
     from engine.providers.mock_provider import MockProvider
 
@@ -43,6 +47,12 @@ def create_provider(model_key, api_key=None, effort=None, analysis_engine=None):
     if model_info.provider == "pikafish":
         from engine.providers.pikafish_provider import PikafishProvider
         return PikafishProvider(model_info, engine=analysis_engine), None
+
+    if external:
+        # Không kiểm tra API key ở đây: key nằm trong trình duyệt của người dùng và không
+        # bao giờ đi tới Python. Thiếu key sẽ lộ ra thành lỗi gọi API, có thông báo rõ ràng.
+        from engine.providers.external_provider import ExternalProvider
+        return ExternalProvider(model_info), None
 
     resolved_key = _resolve_api_key(model_info, api_key)
     if not resolved_key:

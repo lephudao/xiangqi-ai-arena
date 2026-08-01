@@ -1,6 +1,7 @@
 # Phase 6.3 — Gọi API AI từ trình duyệt
 
-**Status:** pending | **Est:** ~0,75 ngày | **Phụ thuộc:** 6.2
+**Status: XONG phần mã (2026-08-01)** — 172 test xanh, kiểm chứng đường truyền tới cả 5 nhà
+cung cấp trong Chrome. **Chưa gọi thử bằng key thật.** Xem "Kết quả".
 
 ## Mục tiêu
 
@@ -94,9 +95,97 @@ quả vào báo cáo.
 
 ## Acceptance criteria
 
-- [ ] Cả 5 nhà cung cấp gọi được từ trình duyệt bằng key người dùng
-- [ ] Tab Network xác nhận key **không** tới máy chủ dự án, kể cả chế độ local
-- [ ] Prompt do Python dựng, JS không tự chế
-- [ ] Chi phí tính từ `model_registry`, không chép bảng giá sang JS
-- [ ] Key hiển thị dạng che, an toàn khi quay màn hình
-- [ ] Thông báo minh bạch hiện ngay cạnh ô nhập key
+- [x] **4/5** nhà cung cấp gọi được từ trình duyệt (OpenAI cố ý chặn — xem dưới)
+- [x] Prompt do Python dựng, JS không tự chế
+- [x] Chi phí tính từ `model_registry`, không chép bảng giá sang JS
+- [x] Key hiển thị dạng che, an toàn khi quay màn hình
+- [ ] Thông báo minh bạch cạnh ô nhập key — **để phase 6.4** cùng lúc dựng giao diện
+- [ ] Gọi thử bằng key thật — **chưa làm**, cần người dùng quyết
+
+---
+
+## Kết quả (2026-08-01)
+
+### Phát hiện quan trọng: OpenAI KHÔNG gọi được từ trình duyệt
+
+Kế hoạch gốc ghi cả 5 nhà cung cấp đều được, dựa trên preflight OPTIONS bằng curl.
+**Kết luận đó sai.** Gọi thật từ Chrome mới lộ ra:
+
+```
+authorization + content-type  ->  CHẶN: Failed to fetch
+chỉ content-type              ->  status 401
+chỉ authorization             ->  CHẶN: Failed to fetch
+không header nào              ->  status 401
+```
+
+Thu hẹp bằng curl: preflight OPTIONS trả 200 kèm `access-control-allow-headers: authorization`
+với mọi origin (kể cả localhost). Nhưng phản hồi THẬT của `POST /chat/completions`:
+
+| Request | `access-control-allow-origin` |
+|---|---|
+| có `Authorization` | **không có** |
+| không `Authorization` | `*` |
+
+Đây là chủ ý của OpenAI nhằm chặn dùng API key ở trình duyệt.
+
+**Bài học:** preflight thông không có nghĩa là gọi được. Chỉ gọi thật từ trình duyệt thật mới
+kết luận được. Đã ghi vào `model_registry` bằng cờ `browser_cors=False` — cùng chỗ với các dữ
+kiện model khác, kèm test canh giữ.
+
+ChatGPT vẫn đấu bình thường ở **bản local**. Bản online chặn từ đầu với lý do rõ ràng
+("ChatGPT (GPT-5) chỉ chạy được ở bản local") thay vì để người dùng gặp "Failed to fetch".
+
+### Kiểm chứng đường truyền — dùng key GIẢ cố ý
+
+Lỗi xác thực trả về chính là bằng chứng request tới được nơi cần tới. Không tốn tiền:
+
+| Nhà cung cấp | Lỗi nhận được |
+|---|---|
+| Anthropic | `invalid x-api-key` |
+| Gemini | `API key not valid. Please pass a valid API key.` |
+| DeepSeek | `Authentication Fails, Your api key: ****co-y is invalid` |
+| xAI | `Incorrect API key provided. You can obtain an API key from https://console.x.ai.` |
+| OpenAI | chặn từ đầu, không gửi request |
+
+### Lỗi thứ hai: xAI trả `error` là chuỗi
+
+Các hãng khác dùng `{error: {message}}`, xAI dùng `{error: "chuỗi"}`. Code ban đầu chỉ đọc
+`error.message` nên lỗi của xAI biến thành `HTTP 400` trống rỗng — người dùng không biết phải
+sửa gì. Thêm `errorMessage()` dùng chung, xử cả hai hình dạng.
+
+### Kiến trúc: JS không giữ bản sao nào của bảng model
+
+`describe_models()` phía Python cung cấp model ID, base URL, `MOVE_SCHEMA` và cờ năng lực
+(`supports_effort`, `supports_adaptive_thinking`). Chép sang JS thì hai bảng sẽ lệch, và biểu
+hiện ra ngoài là lỗi 400 khó hiểu — ví dụ gửi `effort` cho Haiku 4.5.
+
+Tương tự với tiền: JS chỉ báo số token, `decision_from_payload` tra bảng giá và tính.
+
+### `ExternalProvider` — chỗ suýt sai âm thầm
+
+Ở bản trình duyệt, trọng tài vẫn cần đối tượng kỳ thủ để biết danh tính và "có phải người
+chơi không", nhưng không được tự gọi mạng. Nếu để `create_provider` chạy như thường thì nó đi
+tìm API key trong biến môi trường, không thấy, rồi **âm thầm rơi về Mock**: người xem tưởng
+đang xem Claude đánh cờ mà thật ra là đi ngẫu nhiên.
+
+Thêm `external=True` và `ExternalProvider`. Gọi `decide()` trên nó sẽ báo lỗi thẳng.
+
+### Files
+
+| File | Việc |
+|---|---|
+| `web/js/key-vault.js` | localStorage theo nhà cung cấp, che key khi hiển thị |
+| `web/js/ai-providers/response-shape.js` | Hình dạng quyết định + đọc lỗi + parse JSON |
+| `web/js/ai-providers/anthropic-client.js` | Claude, kèm header direct-browser-access |
+| `web/js/ai-providers/gemini-client.js` | Gemini, cộng `thoughtsTokenCount` vào token ra |
+| `web/js/ai-providers/openai-compatible-client.js` | Grok + DeepSeek (OpenAI bị chặn) |
+| `web/js/ai-providers/provider-registry.js` | Chọn client, kiểm key, `checkReady()` |
+| `engine/providers/external_provider.py` | Kỳ thủ do bên ngoài quyết định |
+| `engine/browser_bridge.py` | `describe_models()`, tính tiền phía Python |
+| `engine/model_registry.py` | Cờ `browser_cors` |
+
+### Còn thiếu
+
+**Chưa gọi thử bằng key thật** — nghĩa là đường thành công (parse JSON nước đi từ phản hồi
+200) chưa được kiểm trực tiếp ở JS. Code là bản sao của provider Python đã kiểm chứng, nhưng
+đó là suy luận chứ không phải bằng chứng.

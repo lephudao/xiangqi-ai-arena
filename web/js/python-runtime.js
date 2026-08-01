@@ -77,10 +77,21 @@ import os, sys
 _bundle_dir = os.getcwd()
 if _bundle_dir not in sys.path:
     sys.path.insert(0, _bundle_dir)
-from engine.browser_bridge import BrowserArena
+from engine.browser_bridge import BrowserArena, describe_models
 `);
 
     onProgress({ phase: "ready" });
+}
+
+/**
+ * Danh mục kỳ thủ và schema phản hồi, lấy từ model_registry của Python.
+ *
+ * JS không giữ bản sao nào của bảng model: model ID, base URL, cờ năng lực và giá đều chỉ
+ * tồn tại ở một chỗ.
+ */
+export function describeModels() {
+    if (!pyodide) throw new Error("Chưa nạp xong Pyodide — gọi init() trước");
+    return toJs(pyodide.globals.get("describe_models")());
 }
 
 export function isReady() {

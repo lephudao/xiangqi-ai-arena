@@ -108,9 +108,12 @@ class MatchReferee:
         )
         return self.record_id
 
-    def __init__(self, red_config=None, black_config=None, analysis_engine=AUTO_ANALYSIS_ENGINE):
+    def __init__(self, red_config=None, black_config=None, analysis_engine=AUTO_ANALYSIS_ENGINE,
+                 external_providers=False):
         # Key giữ riêng, không bao giờ đi vào cấu hình công khai hay cơ sở dữ liệu
         self._api_keys = {}
+        # True khi bên gọi tự lo phần gọi API (bản chạy trong trình duyệt)
+        self._external_providers = external_providers
         self.red_config = self._set_side_config('w', red_config or DEFAULT_RED_CONFIG, "Kỳ thủ Đỏ")
         self.black_config = self._set_side_config('b', black_config or DEFAULT_BLACK_CONFIG,
                                                   "Kỳ thủ Đen")
@@ -141,6 +144,7 @@ class MatchReferee:
             api_key=self._api_keys.get(side),
             effort=config.get("effort"),
             analysis_engine=self.analysis_engine,
+            external=self._external_providers,
         )
         if note:
             self._pending_notes.append(f"Trọng tài: {config.get('name', '?')} — {note}")

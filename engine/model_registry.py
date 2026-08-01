@@ -28,6 +28,9 @@ class ModelInfo:
     # dùng adaptive và đã bỏ budget_tokens.
     supports_effort: bool = True
     supports_adaptive_thinking: bool = True
+    # Trình duyệt gọi thẳng được không? OpenAI CỐ Ý bỏ header CORS trên phản hồi
+    # /chat/completions khi request có Authorization — xem chú thích ở _OPENAI_COMPATIBLE.
+    browser_cors: bool = True
 
 
 # Giá Anthropic theo bảng giá chính thức. Sonnet 5 đang có giá giới thiệu
@@ -68,10 +71,17 @@ _GEMINI = [
 
 # Các nhà cung cấp dùng chung chuẩn OpenAI /chat/completions.
 # CHƯA kiểm chứng bằng key thật — đánh dấu verified=False để không hứa suông.
+#
+# OpenAI KHÔNG gọi được từ trình duyệt (đo ngày 2026-08-01): preflight OPTIONS trả 200 và
+# cho phép cả header `authorization`, nhưng phản hồi THẬT của POST /chat/completions lại bỏ
+# `access-control-allow-origin` khi request có Authorization. Cùng request đó mà bỏ
+# Authorization thì phản hồi có đủ header CORS. Đây là chủ ý của OpenAI nhằm chặn dùng API
+# key ở trình duyệt — và là lý do không được kết luận chỉ từ preflight.
 _OPENAI_COMPATIBLE = [
     ModelInfo("gpt-5", "ChatGPT (GPT-5)", "openai_compatible", "gpt-5",
               base_url="https://api.openai.com/v1", api_key_env="OPENAI_API_KEY",
-              note="Chưa kiểm chứng: cần OPENAI_API_KEY"),
+              browser_cors=False,
+              note="Chỉ đấu được ở bản local — OpenAI chặn gọi API từ trình duyệt"),
     ModelInfo("grok-4", "Grok 4", "openai_compatible", "grok-4",
               base_url="https://api.x.ai/v1", api_key_env="XAI_API_KEY",
               note="Chưa kiểm chứng: cần XAI_API_KEY"),

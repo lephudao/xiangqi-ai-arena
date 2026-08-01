@@ -30,6 +30,7 @@ FILES=(
     engine/xiangqi/notation.py
     engine/providers/__init__.py
     engine/providers/base_provider.py
+    engine/providers/external_provider.py
     engine/providers/human_provider.py
     engine/providers/mock_provider.py
     engine/analysis/__init__.py

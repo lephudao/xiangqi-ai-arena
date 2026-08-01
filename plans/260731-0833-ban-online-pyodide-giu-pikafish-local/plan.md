@@ -86,17 +86,30 @@ Kết luận: chi phí Pyodide nằm ở **lần nạp đầu tiên**, không n�
 
 ## Đã kiểm chứng (2026-07-31)
 
-### Cả 5 nhà cung cấp cho trình duyệt gọi thẳng
+### 4/5 nhà cung cấp cho trình duyệt gọi thẳng
 
-Test preflight CORS thật từ origin `https://example.github.io`:
+**Đã sửa ngày 2026-08-01.** Bảng cũ ghi cả 5 đều được, dựa trên preflight OPTIONS bằng curl.
+Kết luận đó SAI với OpenAI: gọi thật từ Chrome mới lộ ra.
 
-| Nhà cung cấp | Kết quả | Điều kiện |
+| Nhà cung cấp | Trình duyệt gọi được? | Điều kiện |
 |---|---|---|
 | Gemini | ✅ | |
-| OpenAI | ✅ | |
-| xAI (Grok) | ✅ `allow-origin: *` | |
-| DeepSeek | ✅ | |
 | Anthropic | ✅ | bắt buộc header `anthropic-dangerous-direct-browser-access: true` |
+| xAI (Grok) | ✅ | trả lỗi dạng `{error: "chuỗi"}`, khác các hãng còn lại |
+| DeepSeek | ✅ | |
+| **OpenAI** | ❌ | **cố ý chặn** — xem dưới |
+
+**Vì sao preflight đánh lừa được:** OpenAI trả preflight OPTIONS 200 kèm
+`access-control-allow-headers: authorization`, nhưng phản hồi THẬT của
+`POST /chat/completions` lại **bỏ `access-control-allow-origin` khi request có
+Authorization**. Cùng request đó mà bỏ Authorization thì phản hồi có đủ header CORS. Đây là
+chủ ý của OpenAI nhằm chặn dùng API key ở trình duyệt.
+
+**Bài học:** preflight thông không có nghĩa là gọi được. Chỉ gọi thật từ trình duyệt thật mới
+kết luận được.
+
+ChatGPT vẫn đấu bình thường ở **bản local** (Python gọi API, không vướng CORS). Bản online
+đánh dấu `available: false` và nói rõ lý do trước khi người dùng chọn.
 
 Key đi thẳng từ trình duyệt tới nhà cung cấp, **không qua máy chủ nào của mình** — kể cả ở
 chế độ local.

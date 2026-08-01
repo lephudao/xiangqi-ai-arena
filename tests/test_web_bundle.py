@@ -11,7 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from engine.browser_bridge import BrowserArena, decision_from_payload
+from engine.browser_bridge import BrowserArena, decision_from_payload, describe_models
+from engine.providers.external_provider import ExternalProvider
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 BUNDLE = REPO_ROOT / "web" / "vendor" / "engine-core.zip"
@@ -80,6 +81,87 @@ def test_legal_moves_from_square_comes_from_referee_rules():
 def test_submit_decision_before_begin_turn_is_an_error():
     with pytest.raises(RuntimeError, match="begin_turn"):
         _arena().submit_decision({"move_ucci": "h2e2"})
+
+
+def test_api_players_never_call_the_network_from_python():
+    """
+    Ở bản trình duyệt, key nằm trong máy người dùng và Python không được mở kết nối nào.
+
+    Kỳ thủ dùng API phải là ExternalProvider — chỉ mang danh tính. Nếu tạo nhầm thành
+    provider thật thì Python sẽ đi tìm API key trong biến môi trường, không thấy, rồi âm
+    thầm rơi về Mock: người dùng tưởng đang xem Claude đánh cờ mà thật ra là đi ngẫu nhiên.
+    """
+    arena = BrowserArena({"model_key": "claude-haiku-4-5"}, {"model_key": "gemini-3.6-flash"})
+
+    assert isinstance(arena.referee.red_agent, ExternalProvider)
+    assert isinstance(arena.referee.black_agent, ExternalProvider)
+    assert arena.referee.red_agent.model_key == "claude-haiku-4-5"
+
+    with pytest.raises(RuntimeError, match="submit_decision"):
+        arena.referee.red_agent.decide("prompt", ["h2e2"])
+
+
+def test_cost_is_computed_by_python_not_javascript():
+    """JS chỉ báo số token. Chép bảng giá sang JS thì bộ đếm sẽ lệch hoá đơn thật."""
+    decision = decision_from_payload({
+        "move_ucci": "h2e2", "model_key": "claude-haiku-4-5",
+        "tokens_in": 1_000_000, "tokens_out": 1_000_000,
+    })
+    assert decision.cost_usd == pytest.approx(6.00)   # Haiku 4.5: $1 vào + $5 ra
+
+    # Model chưa niêm yết giá -> None, để giao diện hiện "—" thay vì con số bịa
+    unpriced = decision_from_payload({"move_ucci": "h2e2", "model_key": "gemini-3-pro",
+                                      "tokens_in": 1000, "tokens_out": 100})
+    assert unpriced.cost_usd is None
+
+
+def test_model_catalog_marks_pikafish_unavailable_in_browser():
+    """
+    Pikafish chạy bằng tiến trình con nên không có trong bundle. Để lọt vào danh sách kỳ thủ
+    thì người dùng chọn xong sẽ gặp ImportError giữa trận.
+    """
+    catalog = describe_models()
+    by_key = {model["key"]: model for model in catalog["models"]}
+
+    assert by_key["pikafish"]["available"] is False
+    assert by_key["mock"]["available"] is True
+    assert by_key["human"]["available"] is True
+    assert by_key["claude-haiku-4-5"]["available"] is True
+
+
+def test_openai_is_marked_unavailable_in_browser():
+    """
+    OpenAI cố ý bỏ header CORS trên phản hồi /chat/completions khi request có Authorization,
+    nên trình duyệt không gọi được (đo 2026-08-01, xem chú thích trong model_registry).
+
+    Không đánh dấu thì người dùng chọn ChatGPT xong sẽ thấy "Failed to fetch" — thông báo
+    của trình duyệt, không nói được vì sao và không sửa được.
+    """
+    by_key = {model["key"]: model for model in describe_models()["models"]}
+
+    assert by_key["gpt-5"]["available"] is False
+    # Grok và DeepSeek vẫn gọi được từ trình duyệt
+    assert by_key["grok-4"]["available"] is True
+    assert by_key["deepseek-chat"]["available"] is True
+
+
+def test_model_catalog_carries_what_javascript_needs_to_build_requests():
+    """JS không được chép bảng model — mọi thứ dựng request phải đến từ đây."""
+    by_key = {model["key"]: model for model in describe_models()["models"]}
+
+    haiku = by_key["claude-haiku-4-5"]
+    assert haiku["model_id"] == "claude-haiku-4-5"
+    assert haiku["api_key_env"] == "ANTHROPIC_API_KEY"
+    # Haiku 4.5 từ chối effort và adaptive thinking với lỗi 400 — JS phải biết mà không gửi
+    assert haiku["supports_effort"] is False
+    assert haiku["supports_adaptive_thinking"] is False
+
+    assert by_key["grok-4"]["base_url"] == "https://api.x.ai/v1"
+    assert by_key["mock"]["needs_api_key"] is False
+
+    schema = describe_models()["move_schema"]
+    assert schema["properties"]["move_ucci"]["type"] == "string", \
+        "move_ucci phải là string tự do, ép enum sẽ mất tín hiệu AI đọc được bàn cờ hay không"
 
 
 def test_misspelled_field_is_rejected_loudly():
