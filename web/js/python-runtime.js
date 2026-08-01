@@ -77,7 +77,7 @@ import os, sys
 _bundle_dir = os.getcwd()
 if _bundle_dir not in sys.path:
     sys.path.insert(0, _bundle_dir)
-from engine.browser_bridge import BrowserArena, describe_models
+from engine.browser_bridge import BrowserArena, apply_elo, describe_models
 `);
 
     onProgress({ phase: "ready" });
@@ -92,6 +92,17 @@ from engine.browser_bridge import BrowserArena, describe_models
 export function describeModels() {
     if (!pyodide) throw new Error("Chưa nạp xong Pyodide — gọi init() trước");
     return toJs(pyodide.globals.get("describe_models")());
+}
+
+/**
+ * Cập nhật bảng xếp hạng sau một trận, bằng công thức Elo dùng chung với bản local.
+ * `resultStatus`: 'red_win' | 'black_win' | 'draw'.
+ */
+export function applyElo(rows, redModelKey, blackModelKey, resultStatus) {
+    if (!pyodide) throw new Error("Chưa nạp xong Pyodide — gọi init() trước");
+    return toJs(pyodide.globals.get("apply_elo")(
+        pyodide.toPy(rows), redModelKey, blackModelKey, resultStatus,
+    ));
 }
 
 export function isReady() {
@@ -136,6 +147,14 @@ export function beginTurn() {
  */
 export function submitDecision(decision) {
     return toJs(requireArena().submit_decision(pyodide.toPy(decision)));
+}
+
+/**
+ * Để kỳ thủ chạy ngay trong Python tự quyết (Mock). Dùng khi `beginTurn()` trả về yêu cầu
+ * có `external: false` — không tốn lượt gọi mạng nào.
+ */
+export function submitLocalDecision() {
+    return toJs(requireArena().submit_local_decision());
 }
 
 export function submitHumanMove(ucci) {

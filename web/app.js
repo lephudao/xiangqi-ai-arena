@@ -6,6 +6,7 @@
 import { renderBoardGrid, renderPieces } from './js/board-renderer.js';
 import { ReplayController } from './js/replay-controller.js';
 import { HumanInput } from './js/human-input.js';
+import { createArenaClient } from './js/arena-client.js';
 
 let currentState = null;
 let isAutoPlaying = false;
@@ -14,10 +15,18 @@ let synth = window.speechSynthesis;
 let availableModels = [];
 let replay = null;
 let humanInput = null;
+// Lớp trung gian: chế độ Local gọi máy chủ Flask, chế độ Online chạy Pyodide trong trình
+// duyệt. Phần còn lại của file này không cần biết đang ở chế độ nào.
+let arena = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
     applyOverlayMode();
     renderBoardGrid(document.getElementById('board'));
+
+    arena = await createArenaClient(showLoadingProgress);
+    hideLoadingProgress();
+    applyCapabilities(arena.capabilities);
+
     await loadModels();
     fetchState();
 
@@ -43,16 +52,12 @@ function setupHumanPlay() {
 
 async function submitHumanMove(ucci) {
     try {
-        const response = await fetch('/api/human-move', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ucci }),
-        });
-        const data = await response.json();
-        if (!response.ok) {
+        const result = await arena.submitHumanMove(ucci);
+        const data = result.state;
+        if (!result.ok) {
             // Nước sai luật: hiện đúng lý do trọng tài đưa ra, không im lặng bỏ qua
-            document.getElementById('referee-text').textContent = `Nước không hợp lệ: ${data.error}`;
-            updateUI(data.state);
+            document.getElementById('referee-text').textContent = `Nước không hợp lệ: ${result.error}`;
+            updateUI(data);
             return;
         }
         playPieceSound();
@@ -69,9 +74,8 @@ async function submitHumanMove(ucci) {
 
 async function requestHint() {
     try {
-        const response = await fetch('/api/hint', { method: 'POST' });
-        const data = await response.json();
-        if (!response.ok) {
+        const data = await arena.requestHint();
+        if (!data.ok) {
             document.getElementById('referee-text').textContent = data.error;
             return;
         }
@@ -148,7 +152,7 @@ async function loadLeaderboard() {
     const container = document.getElementById('leaderboard-list');
     container.innerHTML = '<div class="data-empty">Đang tải…</div>';
     try {
-        const { leaderboard } = await (await fetch('/api/leaderboard')).json();
+        const leaderboard = await arena.leaderboard();
         if (!leaderboard.length) {
             container.innerHTML = '<div class="data-empty">Chưa có trận nào kết thúc đúng luật cờ.</div>';
             return;
@@ -166,6 +170,7 @@ async function loadLeaderboard() {
 }
 
 async function loadReplayList() {
+    if (!arena.capabilities.replay) return;   // bản online không lưu nước đi
     const container = document.getElementById('replay-list');
     container.innerHTML = '<div class="data-empty">Đang tải…</div>';
     try {
@@ -313,8 +318,7 @@ function escapeHtml(text) {
 // Nạp danh mục kỳ thủ và dựng dropdown — tránh hardcode model trong HTML
 async function loadModels() {
     try {
-        const resp = await fetch('/api/models');
-        const data = await resp.json();
+        const data = await arena.listModels();
         availableModels = data.models;
         fillModelSelect('cfg-red-model', data.default_red);
         fillModelSelect('cfg-black-model', data.default_black);
@@ -338,9 +342,7 @@ function fillModelSelect(elementId, defaultKey) {
 
 async function fetchState() {
     try {
-        const resp = await fetch('/api/state');
-        const data = await resp.json();
-        updateUI(data);
+        updateUI(await arena.getState());
     } catch (e) {
         console.error("Failed to fetch state:", e);
     }
@@ -359,8 +361,7 @@ async function handleStep() {
         : null;
     showThinking(thinkingPlayer);
     try {
-        const resp = await fetch('/api/step', { method: 'POST' });
-        const data = await resp.json();
+        const data = await arena.step();
         playPieceSound();
         updateUI(data);
 
@@ -391,6 +392,48 @@ async function handleStep() {
     } finally {
         hideThinking();
     }
+}
+
+// ===== Chế độ chạy: Local (có máy chủ) hay Online (Pyodide trong trình duyệt) =====
+
+const LOADING_PHASES = {
+    download: 'Đang tải bộ máy Python…',
+    boot: 'Đang khởi động Python…',
+    engine: 'Đang nạp luật cờ…',
+    ready: 'Xong!',
+};
+
+function showLoadingProgress({ phase, ratio }) {
+    const overlay = document.getElementById('loading-overlay');
+    overlay.hidden = false;
+    document.getElementById('loading-phase').textContent = LOADING_PHASES[phase] ?? phase;
+    // Chỉ phase tải mới đo được theo byte; các phase sau chạy nhanh nên lấp đầy thanh luôn
+    const percent = phase === 'download' ? Math.round((ratio ?? 0) * 100) : 100;
+    document.getElementById('loading-bar').style.width = `${percent}%`;
+}
+
+function hideLoadingProgress() {
+    document.getElementById('loading-overlay').hidden = true;
+}
+
+/**
+ * Bật/tắt tính năng theo năng lực thật của chế độ đang chạy.
+ *
+ * Ẩn nút thay vì để người dùng bấm rồi nhận lỗi: bản online không có Pikafish nên không có
+ * chấm điểm, không có gợi ý, và không lưu trận để xem lại.
+ */
+function applyCapabilities(capabilities) {
+    const isLocal = capabilities.mode === 'local';
+
+    const badge = document.getElementById('mode-badge');
+    badge.hidden = false;
+    badge.textContent = isLocal ? '🔬 Local — có Pikafish' : '🌐 Online — không chấm điểm';
+    badge.classList.toggle('mode-online', !isLocal);
+
+    // Nút vẫn giữ vì hộp thoại đó cũng chứa bảng xếp hạng — bản online có Elo riêng trong
+    // trình duyệt. Chỉ ẩn phần danh sách trận, vì bản online không lưu nước đi.
+    document.getElementById('replay-section').hidden = !capabilities.replay;
+    // Nút Gợi Ý do updateUI điều khiển theo lượt; nó cũng đọc capabilities.analysis.
 }
 
 // Lớp phủ trong lúc chờ AI trả lời, kèm đồng hồ đếm để biết đã chờ bao lâu
@@ -453,9 +496,7 @@ function scheduleNextStep() {
 async function handleReset() {
     stopAutoPlay();
     hideResultBanner();
-    const resp = await fetch('/api/reset', { method: 'POST' });
-    const data = await resp.json();
-    updateUI(data);
+    updateUI(await arena.reset());
 }
 
 // Banner kết quả — thay alert() vì hộp thoại browser làm gián đoạn việc ghi hình
@@ -530,7 +571,8 @@ function updateUI(state) {
     const humanTurn = !!state.is_human_turn && !state.game_over;
     if (humanInput) humanInput.setState(humanTurn, state.legal_moves);
     document.body.classList.toggle('human-turn', humanTurn);
-    document.getElementById('btn-hint').hidden = !humanTurn;
+    // Gợi ý cần Pikafish, mà bản online không có -> ẩn hẳn thay vì để bấm rồi báo lỗi
+    document.getElementById('btn-hint').hidden = !humanTurn || !arena?.capabilities.analysis;
     if (humanTurn) {
         document.getElementById('referee-text').textContent =
             'Tới lượt bạn — bấm vào quân cờ để xem các nước đi được.';
@@ -705,11 +747,5 @@ async function saveConfig() {
 
     closeModal();
 
-    const resp = await fetch('/api/reset', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ red_config: redConfig, black_config: blackConfig })
-    });
-    const data = await resp.json();
-    updateUI(data);
+    updateUI(await arena.reset(redConfig, blackConfig));
 }

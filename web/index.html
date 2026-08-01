@@ -11,12 +11,25 @@
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+    <!-- Màn hình nạp cho bản online: Pyodide ~10MB lần đầu. Không có nó thì người dùng nhìn
+         trang trống vài chục giây và tưởng hỏng. -->
+    <div id="loading-overlay" class="loading-overlay" hidden>
+        <div class="loading-card">
+            <h2>Đang khởi động đấu trường</h2>
+            <p id="loading-phase">Đang tải bộ máy Python…</p>
+            <div class="loading-track"><div id="loading-bar" class="loading-bar"></div></div>
+            <p class="loading-note">Lần đầu tải khoảng 13MB, những lần sau vào ngay.</p>
+        </div>
+    </div>
+
     <div class="studio-container">
         <!-- Top Bar / Header -->
         <header class="studio-header">
             <div class="logo">
                 <span class="badge-live">LIVE STUDIO</span>
                 <h1>ĐẠI CHIẾN AI CỜ TƯỚNG</h1>
+                <!-- Chế độ đang chạy: lúc quay video phải biết ngay có Pikafish chấm điểm hay không -->
+                <span id="mode-badge" class="mode-badge" hidden></span>
             </div>
             <div class="match-info">
                 <span id="turn-badge" class="turn-indicator turn-red">LƯỢT QUÂN ĐỎ</span>
@@ -193,9 +206,11 @@
                    hết giới hạn nước hoặc hết ngân sách không được tính.</p>
                 <div id="leaderboard-list" class="data-list"></div>
 
-                <h3 class="section-title">Trận đã lưu</h3>
-                <p class="section-note">Xem lại đọc từ cơ sở dữ liệu — không gọi API, không tốn tiền.</p>
-                <div id="replay-list" class="data-list"></div>
+                <section id="replay-section">
+                    <h3 class="section-title">Trận đã lưu</h3>
+                    <p class="section-note">Xem lại đọc từ cơ sở dữ liệu — không gọi API, không tốn tiền.</p>
+                    <div id="replay-list" class="data-list"></div>
+                </section>
             </div>
         </div>
     </div>

@@ -11,8 +11,14 @@ from pathlib import Path
 
 import pytest
 
-from engine.browser_bridge import BrowserArena, decision_from_payload, describe_models
+from engine.browser_bridge import (
+    BrowserArena,
+    apply_elo,
+    decision_from_payload,
+    describe_models,
+)
 from engine.providers.external_provider import ExternalProvider
+from engine.storage.elo_rating import STARTING_ELO
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 BUNDLE = REPO_ROOT / "web" / "vendor" / "engine-core.zip"
@@ -162,6 +168,48 @@ def test_model_catalog_carries_what_javascript_needs_to_build_requests():
     schema = describe_models()["move_schema"]
     assert schema["properties"]["move_ucci"]["type"] == "string", \
         "move_ucci phải là string tự do, ép enum sẽ mất tín hiệu AI đọc được bàn cờ hay không"
+
+
+# --- Bảng xếp hạng Elo của bản online ---
+
+def test_elo_uses_result_status_not_winner_side():
+    """
+    `score_from_result` nhận TRẠNG THÁI KẾT QUẢ ('red_win'), không phải bên thắng ('w').
+
+    Truyền nhầm thì nó trả None và phép trừ trong update_ratings vỡ giữa trận — đúng lúc
+    người dùng vừa đánh xong.
+    """
+    rows = apply_elo([], "claude-haiku-4-5", "gemini-3.6-flash", "red_win")
+    by_key = {row["model_key"]: row for row in rows}
+
+    assert by_key["claude-haiku-4-5"]["elo"] > STARTING_ELO
+    assert by_key["gemini-3.6-flash"]["elo"] < STARTING_ELO
+    assert by_key["claude-haiku-4-5"]["wins"] == 1
+    assert by_key["gemini-3.6-flash"]["losses"] == 1
+    assert rows[0]["model_key"] == "claude-haiku-4-5", "phải xếp theo Elo giảm dần"
+
+
+def test_elo_ignores_a_model_playing_itself():
+    """
+    Mock vs Mock là cùng một dòng trong bảng: thắng và thua đè lên nhau, và tự đấu với chính
+    mình cũng không nói lên điều gì về sức mạnh tương đối.
+    """
+    assert apply_elo([], "mock", "mock", "red_win") == []
+
+
+def test_elo_ignores_unfinished_match():
+    assert apply_elo([], "claude-haiku-4-5", "gemini-3.6-flash", "ongoing") == []
+
+
+def test_elo_accumulates_across_matches():
+    rows = apply_elo([], "claude-haiku-4-5", "gemini-3.6-flash", "red_win")
+    rows = apply_elo(rows, "claude-haiku-4-5", "gemini-3.6-flash", "draw")
+    by_key = {row["model_key"]: row for row in rows}
+
+    assert by_key["claude-haiku-4-5"]["matches"] == 2
+    assert by_key["claude-haiku-4-5"]["draws"] == 1
+    # Tổng Elo được bảo toàn qua mọi trận
+    assert sum(row["elo"] for row in rows) == pytest.approx(2 * STARTING_ELO)
 
 
 def test_misspelled_field_is_rejected_loudly():

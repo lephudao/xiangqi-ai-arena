@@ -10,9 +10,11 @@ Lớp này là GLUE, không chứa luật cờ. Mọi quyết định về luậ
 `xiangqi/` — chạy y hệt nhau ở máy chủ lẫn trình duyệt.
 """
 
-from engine.model_registry import ALL_MODELS, estimate_cost_usd
+from engine.model_registry import ALL_MODELS, estimate_cost_usd, get_model
+from engine.storage.elo_rating import STARTING_ELO, score_from_result, update_ratings
 from engine.providers import MoveDecision
 from engine.providers.base_provider import MOVE_SCHEMA
+from engine.providers.external_provider import ExternalProvider
 from engine.referee import MatchReferee
 
 # Pikafish chạy bằng tiến trình con nên không có trong bản trình duyệt. Để lọt vào danh sách
@@ -32,10 +34,12 @@ class BrowserArena:
         self.referee = MatchReferee(red_config, black_config, analysis_engine=None,
                                     external_providers=True)
         self._turn = None
+        self._request = None
 
     def new_match(self, red_config=None, black_config=None):
         self.referee.reset(red_config, black_config)
         self._turn = None
+        self._request = None
         return self.get_state()
 
     def get_state(self):
@@ -63,12 +67,40 @@ class BrowserArena:
             raise RuntimeError("submit_decision phải gọi sau begin_turn")
         return self._resume(decision_from_payload(payload))
 
+    def submit_local_decision(self):
+        """
+        Để kỳ thủ chạy ngay trong Python tự quyết (Mock).
+
+        Mock chọn ngẫu nhiên trong danh sách hợp lệ nên không cần gọi mạng. Để JS tự bốc
+        nước thay Mock thì bản online và bản local sẽ cho kết quả khác nhau trên cùng thế
+        cờ, và Mock thôi không còn là mốc sàn so sánh được nữa.
+        """
+        if self._turn is None or self._request is None:
+            raise RuntimeError("submit_local_decision phải gọi sau begin_turn")
+        agent = self.referee._agent(self._request["side"])
+        decision = agent.decide(
+            self._request["prompt"], self._request["legal_moves"],
+            board=self.referee.board, side=self._request["side"],
+        )
+        return self._resume(decision)
+
     def _resume(self, decision):
         try:
-            return self._turn.send(decision)
+            self._request = self._turn.send(decision)
         except StopIteration:
             self._turn = None
+            self._request = None
             return None
+
+        # `external` cho JS biết phải tự gọi API hay để Python quyết; `model_key` để JS chọn
+        # đúng client mà không phải tra lại trạng thái. Tính ở đây chứ không ở trọng tài:
+        # trọng tài không cần biết chuyện chạy trong trình duyệt.
+        agent = self.referee._agent(self._request["side"])
+        return {
+            **self._request,
+            "external": isinstance(agent, ExternalProvider),
+            "model_key": agent.model_key,
+        }
 
     # --- Kỳ thủ người ---
 
@@ -85,6 +117,55 @@ class BrowserArena:
         """
         side = self.referee.board.turn
         return [m for m in self.referee.board.generate_legal_moves(side) if m.startswith(square)]
+
+
+def apply_elo(board_rows, red_model_key, black_model_key, result_status):
+    """
+    Cập nhật bảng xếp hạng sau một trận, dùng cho bản online (lưu trong localStorage).
+
+    Dùng CHUNG `engine/storage/elo_rating.py` với bản local — cùng K, cùng điểm khởi đầu.
+    Viết lại công thức trong JS thì hai bảng xếp hạng sẽ trôi khỏi nhau và không so được.
+
+    `board_rows`: danh sách dict đã lưu. `result_status`: 'red_win' | 'black_win' | 'draw'.
+    Trả về danh sách mới, đã xếp theo Elo giảm dần. Trận chưa kết thúc đúng luật thì trả lại
+    bảng cũ nguyên vẹn.
+    """
+    if hasattr(board_rows, "to_py"):
+        board_rows = board_rows.to_py()
+
+    rows = {row["model_key"]: dict(row) for row in (board_rows or [])}
+    red_score = score_from_result(result_status, 'w')
+    if red_score is None:
+        return sorted(rows.values(), key=lambda row: row["elo"], reverse=True)
+
+    # Một model tự đấu với chính nó không nói lên điều gì về sức mạnh tương đối, và cộng vào
+    # thì hai bên là CÙNG một dòng trong bảng — thắng và thua đè lên nhau.
+    if red_model_key == black_model_key:
+        return sorted(rows.values(), key=lambda row: row["elo"], reverse=True)
+
+    def entry(model_key):
+        model = get_model(model_key)
+        return rows.setdefault(model_key, {
+            "model_key": model_key,
+            "label": model.label if model else model_key,
+            "elo": STARTING_ELO,
+            "matches": 0, "wins": 0, "losses": 0, "draws": 0,
+        })
+
+    red, black = entry(red_model_key), entry(black_model_key)
+    red["elo"], black["elo"] = update_ratings(red["elo"], black["elo"], red_score)
+
+    for row in (red, black):
+        row["matches"] += 1
+    if result_status == "draw":
+        red["draws"] += 1
+        black["draws"] += 1
+    else:
+        winner, loser = (red, black) if result_status == "red_win" else (black, red)
+        winner["wins"] += 1
+        loser["losses"] += 1
+
+    return sorted(rows.values(), key=lambda row: row["elo"], reverse=True)
 
 
 def describe_models():

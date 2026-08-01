@@ -1,0 +1,58 @@
+# Triển khai bản online lên GitHub Pages.
+#
+# Bản online là trang TĨNH: trọng tài chạy bằng Pyodide trong trình duyệt, người xem tự nhập
+# API key của họ. Không có máy chủ, không tốn tiền hạ tầng.
+#
+# Chạy tay (workflow_dispatch) chứ không tự chạy theo push: repo đang để riêng tư trong lúc
+# quay loạt video đầu, và deploy là hành động công khai — phải do người quyết định.
+name: Triển khai bản online lên GitHub Pages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Không cho hai lần deploy chồng nhau
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Chạy test trước khi triển khai
+        run: |
+          pip install --quiet -r requirements.txt
+          python -m pytest tests/ -q
+
+      # Cả hai thư mục đều là sản phẩm sinh ra, không nằm trong git
+      - name: Tải Pyodide
+        run: ./scripts/install-pyodide.sh
+
+      - name: Đóng gói lõi Python
+        run: ./scripts/build-web-bundle.sh
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

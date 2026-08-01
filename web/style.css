@@ -994,3 +994,64 @@ body.human-turn .xiangqi-board { cursor: pointer; }
     z-index: 6;
     pointer-events: none;
 }
+
+/* ===== Huy hiệu chế độ chạy ===== */
+/* Lúc quay video phải nhìn ra ngay đang ở chế độ nào: bản online không có Pikafish
+   nên không có điểm chấm, mà nhìn bàn cờ thì không phân biệt được. */
+.mode-badge {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: rgba(56, 189, 248, 0.15);
+    color: #7dd3fc;
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    white-space: nowrap;
+}
+.mode-badge.mode-online {
+    background: rgba(250, 204, 21, 0.13);
+    color: #fde047;
+    border-color: rgba(250, 204, 21, 0.35);
+}
+
+/* ===== Màn hình nạp Pyodide (chỉ bản online) ===== */
+.loading-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-dark, #0f172a);
+}
+.loading-card {
+    width: min(420px, 86vw);
+    text-align: center;
+}
+.loading-card h2 {
+    font-size: 1.15rem;
+    margin-bottom: 10px;
+}
+#loading-phase {
+    font-size: 0.9rem;
+    opacity: 0.8;
+    margin-bottom: 14px;
+}
+.loading-track {
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.22);
+    overflow: hidden;
+}
+.loading-bar {
+    height: 100%;
+    width: 0;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #38bdf8, #818cf8);
+    transition: width 0.25s ease;
+}
+.loading-note {
+    margin-top: 12px;
+    font-size: 0.78rem;
+    opacity: 0.55;
+}

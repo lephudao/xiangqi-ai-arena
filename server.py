@@ -152,6 +152,26 @@ def get_models():
     })
 
 
+@app.route("/api/capabilities", methods=["GET"])
+def get_capabilities():
+    """
+    Những gì máy chủ này làm được, để trình duyệt tự nhận biết đang chạy chế độ nào.
+
+    Bản online là file tĩnh, không có route này -> fetch trả 404 -> giao diện chuyển sang
+    chế độ Online. Nhờ vậy chỉ cần MỘT bản mã và một file HTML cho cả hai chế độ; dựng hai
+    bản riêng thì sớm muộn chúng cũng lệch nhau.
+
+    TUYỆT ĐỐI không trả giá trị API key nào ở đây.
+    """
+    engine = manager.analysis_engine
+    return jsonify({
+        "mode": "local",
+        "analysis": engine is not None and engine.is_available,
+        "database": manager.repository is not None,
+        "replay": manager.repository is not None,
+    })
+
+
 @app.route("/api/replays", methods=["GET"])
 def list_replays():
     """
