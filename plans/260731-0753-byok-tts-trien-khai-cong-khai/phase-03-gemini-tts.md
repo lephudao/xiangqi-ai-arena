@@ -188,12 +188,33 @@ về bên Đỏ hay bên Đen nào, gộp vào là quy sai trách nhiệm chi ph
 | `web/app.js` | Định tuyến Web Speech / Gemini / Tắt, tự chuyển khi lỗi |
 | `web/index.html` | Chọn chế độ đọc, model, giọng; ô chi phí đọc riêng |
 
+### Kiểm thân request mà không tốn tiền (2026-08-02)
+
+Phát hiện dùng được: **Google kiểm hình dạng JSON TRƯỚC khi kiểm API key.** Gửi trường bịa
+đặt với key giả sẽ nhận `Invalid JSON payload received. Unknown name "..."`, còn thân request
+đúng thì chỉ nhận `API key not valid`. Nhờ vậy kiểm được cấu trúc request miễn phí.
+
+| Biến thể gửi thử | Kết quả |
+|---|---|
+| Thân request **đúng như mã đang gửi** | chỉ lỗi key → **cấu trúc đúng** |
+| `responseModalities: ["KHONG_CO_THAT"]` | bị từ chối → `["AUDIO"]` là enum hợp lệ |
+| `speechConfig: {voiceName: ...}` (phẳng) | bị từ chối → cách lồng hiện tại mới đúng |
+| Tên giọng bịa đặt | **qua được** → không kiểm được tên giọng bằng cách này |
+| Model ID bịa đặt | chỉ lỗi key → không kiểm được model ID bằng cách này |
+
 ### Còn thiếu
 
-**Chưa gọi thử bằng key thật**, nên chưa biết chắc:
+**Chưa gọi thử bằng key thật.** Đã kiểm chắc:
 
-- Hình dạng request TTS (`responseModalities: ["AUDIO"]` + `speechConfig`) có đúng không
+- Bọc WAV (từng byte header + `decodeAudioData` giải mã đúng thời lượng)
+- Cấu trúc thân request TTS
+- Định tuyến Web Speech / Gemini / Tắt, và đường tự chuyển khi lỗi
+
+**Chưa kiểm được nếu không có key:**
+
+- 3 model ID TTS có tồn tại không
 - 8 tên giọng (`Kore`, `Puck`, …) có còn hiệu lực không
-- `candidatesTokenCount` có phải là token âm thanh để tính tiền không
+- Đường phản hồi `candidates[0].content.parts[].inlineData.{mimeType,data}` có đúng không
+- `candidatesTokenCount` có phải token âm thanh để tính tiền không
 
-Phần bọc WAV và định tuyến đã kiểm chắc; phần gọi API là suy luận từ tài liệu.
+Một lần gọi thật (~$0,002) là đủ để chốt cả bốn.
