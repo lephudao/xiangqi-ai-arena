@@ -3,6 +3,26 @@
 Đấu trường cờ tướng giữa các LLM (Gemini, ChatGPT, Claude, Grok, …) — đo sức mạnh tính toán
 thật của từng AI và làm nguồn nội dung cho kênh YouTube.
 
+**▶ Chơi thử ngay, không cần cài gì: <https://lephudao.github.io/xiangqi-ai-arena/>**
+
+## Hai chế độ chạy
+
+Cùng một mã nguồn, trang tự nhận biết đang chạy ở đâu:
+
+| | 🌐 Online (GitHub Pages) | 🔬 Local (máy bạn) |
+|---|---|---|
+| Luật cờ & trọng tài | Pyodide trong trình duyệt | Máy chủ Flask |
+| Gọi API AI | trình duyệt, key của bạn | máy chủ local |
+| **Chấm điểm nước đi** | ❌ | ✅ **Pikafish** |
+| Xem lại trận, báo cáo | ❌ | ✅ SQLite |
+| Bảng xếp hạng Elo | localStorage | SQLite |
+| Cần cài đặt | không | Python + `./run.sh` |
+
+Bản online dùng **cùng các file `.py`** với bản local (chạy qua Pyodide), nên luật cờ không
+thể lệch nhau. Chỉ Pikafish là không lên web được — nó chạy bằng tiến trình con.
+
+Lần đầu vào bản online tải khoảng 13MB (Pyodide), sau đó vào ngay.
+
 ## Chạy nhanh
 
 ```bash
