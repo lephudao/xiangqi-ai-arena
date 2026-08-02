@@ -104,3 +104,26 @@ def test_provider_receives_the_key():
         analysis_engine=None,
     )
     assert referee.red_agent.api_key == SECRET
+
+
+def test_model_catalog_names_the_env_var_but_never_a_key_value():
+    """
+    Giao diện cần biết model nào đòi key nào để cảnh báo TRƯỚC khi bắt đầu trận — nếu không,
+    kỳ thủ âm thầm rơi về Mock và người xem tưởng đang xem AI thật đánh cờ.
+
+    Nhưng chỉ được trả TÊN biến môi trường, tuyệt đối không trả giá trị.
+    """
+    import os
+
+    from engine.model_registry import list_models
+
+    os.environ["ANTHROPIC_API_KEY"] = SECRET
+    try:
+        catalog = list_models()
+    finally:
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+
+    by_key = {model["key"]: model for model in catalog}
+    assert by_key["claude-haiku-4-5"]["api_key_env"] == "ANTHROPIC_API_KEY"
+    assert by_key["mock"]["api_key_env"] is None
+    assert SECRET not in json.dumps(catalog)

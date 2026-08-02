@@ -79,6 +79,10 @@ class BrowserArena {
     constructor() {
         this.capabilities = { mode: "online", analysis: false, database: false, replay: false };
         this._recordedMatch = false;
+        // Mở sẵn một trận. Chế độ Local có máy chủ giữ trận đang xem nên `/api/state` luôn
+        // trả về được; ở đây không có ai giữ, thiếu dòng này thì lần `getState()` đầu tiên
+        // vỡ và bàn cờ đứng im cho tới khi người dùng bấm Trận Mới.
+        runtime.newMatch(null, null);
     }
 
     async getState() {

@@ -8,6 +8,8 @@ import { ReplayController } from './js/replay-controller.js';
 import { HumanInput } from './js/human-input.js';
 import { createArenaClient } from './js/arena-client.js';
 import * as geminiTts from './js/gemini-tts.js';
+import { renderKeyVault } from './js/key-vault-ui.js';
+import { getKey, looksLikeApiKey, providerForEnv } from './js/key-vault.js';
 import { VOICES as TTS_VOICES } from './js/gemini-tts.js';
 
 let currentState = null;
@@ -32,6 +34,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadModels();
     ttsModels = await arena.listTtsModels();
     setupTts();
+    setupKeyVault();
     fetchState();
 
     // Event Listeners
@@ -691,6 +694,50 @@ function updateAnalysisWarning(state) {
 }
 
 // Web Speech Synthesis (TTS) — đọc ký hiệu cờ tướng ("Pháo 2 bình 5") rồi tới lời bình
+// ===== Kho API key =====
+
+function setupKeyVault() {
+    renderKeyVault({ mode: arena.capabilities.mode, onChange: refreshKeyWarnings });
+    ['red', 'black'].forEach(side => {
+        document.getElementById(`cfg-${side}-model`)
+            .addEventListener('change', refreshKeyWarnings);
+        // Dán nhầm key vào ô tên là lộ nó lên overlay, tức là lộ luôn trong video
+        document.getElementById(`cfg-${side}-name`).addEventListener('input', refreshKeyWarnings);
+    });
+    refreshKeyWarnings();
+}
+
+/** Key của nhà cung cấp tương ứng với model. Trả undefined nếu model không cần key. */
+function keyForModel(model) {
+    if (!model || !model.api_key_env) return undefined;
+    return getKey(providerForEnv(model.api_key_env)) || undefined;
+}
+
+/**
+ * Cảnh báo ngay trong hộp thoại, TRƯỚC khi bắt đầu trận.
+ *
+ * Không có cảnh báo thì người dùng bấm Bắt Đầu rồi mới phát hiện kỳ thủ của mình âm thầm rơi
+ * về Mock — tưởng đang xem Claude đánh cờ mà thật ra là đi ngẫu nhiên.
+ */
+function refreshKeyWarnings() {
+    ['red', 'black'].forEach(side => {
+        const warning = document.getElementById(`cfg-${side}-keywarn`);
+        const model = availableModels.find(
+            m => m.key === document.getElementById(`cfg-${side}-model`).value);
+        const messages = [];
+
+        if (model && model.api_key_env && !keyForModel(model)) {
+            messages.push(`⚠️ Chưa có key cho ${model.label} — kỳ thủ này sẽ chạy Mock (đi ngẫu nhiên).`);
+        }
+        if (looksLikeApiKey(document.getElementById(`cfg-${side}-name`).value)) {
+            messages.push('⚠️ Ô tên đang chứa thứ trông giống API key. Tên hiển thị công khai trên overlay.');
+        }
+
+        warning.hidden = messages.length === 0;
+        warning.textContent = messages.join(' ');
+    });
+}
+
 // ===== Đọc lời bình =====
 
 let ttsModels = [];
@@ -828,7 +875,9 @@ async function saveConfig() {
             name: document.getElementById(`cfg-${sideKey}-name`).value || (model ? model.label : fallbackName),
             model_key: modelKey,
             effort: document.getElementById(`cfg-${sideKey}-effort`).value || undefined,
-            api_key: document.getElementById(`cfg-${sideKey}-key`).value || undefined
+            // Chỉ gửi key lên máy chủ ở chế độ Local, nơi vòng lặp trọng tài chạy server-side.
+            // Chế độ Online không gửi: trình duyệt tự gọi API bằng key trong kho.
+            api_key: arena.capabilities.mode === 'local' ? keyForModel(model) : undefined,
         };
     };
     const redConfig = buildConfig('red', 'Kỳ thủ Đỏ');

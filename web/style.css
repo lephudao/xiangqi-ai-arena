@@ -1055,3 +1055,58 @@ body.human-turn .xiangqi-board { cursor: pointer; }
     font-size: 0.78rem;
     opacity: 0.55;
 }
+
+/* ===== Kho API key ===== */
+.box-keys .key-notice {
+    font-size: 0.8rem;
+    line-height: 1.55;
+    opacity: 0.8;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: rgba(56, 189, 248, 0.08);
+    border-left: 3px solid rgba(56, 189, 248, 0.5);
+}
+.key-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 7px;
+    flex-wrap: wrap;
+}
+.key-provider {
+    flex: 0 0 130px;
+    font-size: 0.84rem;
+}
+.key-input {
+    flex: 1 1 170px;
+    min-width: 0;
+}
+.key-status {
+    flex: 0 0 auto;
+    font-size: 0.76rem;
+    opacity: 0.85;
+    white-space: nowrap;
+}
+.key-status.missing { opacity: 0.6; }
+.key-help {
+    font-size: 0.74rem;
+    opacity: 0.6;
+    white-space: nowrap;
+}
+.btn-small {
+    padding: 4px 10px;
+    font-size: 0.76rem;
+}
+/* Cảnh báo "model này chưa có key" / "ô tên chứa thứ giống key" */
+.key-warning {
+    margin-top: 8px;
+    font-size: 0.78rem;
+    line-height: 1.5;
+    color: #fde047;
+}
+.cost-extra {
+    font-size: 0.72rem;
+    opacity: 0.7;
+    margin-left: 6px;
+}

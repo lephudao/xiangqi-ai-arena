@@ -142,6 +142,9 @@ def list_models():
             "verified": model.verified,
             "has_pricing": model.input_price is not None,
             "note": model.note,
+            # Giao diện cần biết model nào đòi key nào, để cảnh báo TRƯỚC khi bắt đầu trận
+            # thay vì để kỳ thủ âm thầm rơi về Mock. Chỉ trả TÊN biến, không bao giờ trả giá trị.
+            "api_key_env": model.api_key_env,
         }
         for model in ALL_MODELS
     ]

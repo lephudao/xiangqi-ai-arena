@@ -235,6 +235,17 @@
                 <button id="btn-close-modal" class="btn-close">&times;</button>
             </div>
             <div class="modal-body">
+                <!-- Kho API key: lưu theo NHÀ CUNG CẤP, vì một key dùng chung cho mọi model
+                     của họ. Bắt nhập lại cho từng model là hành hạ người dùng vô ích. -->
+                <fieldset class="config-box box-keys">
+                    <legend>🔑 API Key Của Bạn</legend>
+                    <p class="key-notice" id="key-notice"></p>
+                    <div id="key-vault-rows"></div>
+                    <button type="button" id="btn-clear-keys" class="btn btn-secondary btn-small">
+                        Xoá tất cả key
+                    </button>
+                </fieldset>
+
                 <!-- Red Config -->
                 <fieldset class="config-box box-red">
                     <legend>🔴 Kỳ Thủ Đỏ (Red Side)</legend>
@@ -254,10 +265,7 @@
                             <option value="high">Cao — nghĩ sâu, tốn nhiều token</option>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label>API Key (bỏ trống nếu đã đặt trong .env.local):</label>
-                        <input type="password" id="cfg-red-key" placeholder="Dán OpenAI / Gemini API Key tại đây">
-                    </div>
+                    <p class="key-warning" id="cfg-red-keywarn" hidden></p>
                 </fieldset>
 
                 <!-- Black Config -->
@@ -279,10 +287,7 @@
                             <option value="high">Cao — nghĩ sâu, tốn nhiều token</option>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label>API Key (bỏ trống nếu đã đặt trong .env.local):</label>
-                        <input type="password" id="cfg-black-key" placeholder="Dán Anthropic / Gemini API Key tại đây">
-                    </div>
+                    <p class="key-warning" id="cfg-black-keywarn" hidden></p>
                 </fieldset>
             </div>
             <div class="modal-footer">
