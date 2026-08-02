@@ -9,6 +9,7 @@ import { HumanInput } from './js/human-input.js';
 import { createArenaClient } from './js/arena-client.js';
 import * as geminiTts from './js/gemini-tts.js';
 import { renderKeyVault } from './js/key-vault-ui.js';
+import { classifyMove, playMoveSound } from './js/move-sound.js';
 import { getKey, looksLikeApiKey, providerForEnv } from './js/key-vault.js';
 import { VOICES as TTS_VOICES } from './js/gemini-tts.js';
 
@@ -22,6 +23,9 @@ let humanInput = null;
 // Lớp trung gian: chế độ Local gọi máy chủ Flask, chế độ Online chạy Pyodide trong trình
 // duyệt. Phần còn lại của file này không cần biết đang ở chế độ nào.
 let arena = null;
+// Thế cờ TRƯỚC nước vừa rồi — so số quân để biết nước đó có ăn quân không, từ đó chọn
+// đúng tiếng động. Trạng thái trả về không có cờ "vừa ăn quân".
+let previousFen = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
     applyOverlayMode();
@@ -67,7 +71,8 @@ async function submitHumanMove(ucci) {
             updateUI(data);
             return;
         }
-        playPieceSound();
+        playMoveSound(classifyMove(previousFen, data));
+        previousFen = data.fen;
         updateUI(data);
         if (data.last_move) speakMove(data.last_move);
         if (data.game_over) return showResultBanner(data);
@@ -349,7 +354,9 @@ function fillModelSelect(elementId, defaultKey) {
 
 async function fetchState() {
     try {
-        updateUI(await arena.getState());
+        const state = await arena.getState();
+        previousFen = state.fen;
+        updateUI(state);
     } catch (e) {
         console.error("Failed to fetch state:", e);
     }
@@ -369,7 +376,8 @@ async function handleStep() {
     showThinking(thinkingPlayer);
     try {
         const data = await arena.step();
-        playPieceSound();
+        playMoveSound(classifyMove(previousFen, data));
+        previousFen = data.fen;
         updateUI(data);
 
         // TTS Speech synthesis if enabled
@@ -501,6 +509,7 @@ function scheduleNextStep() {
 async function handleReset() {
     stopAutoPlay();
     hideResultBanner();
+    previousFen = null;   // trận mới: chưa có thế cờ trước để so số quân
     updateUI(await arena.reset());
 }
 
@@ -840,22 +849,6 @@ function updateTtsCost() {
 }
 
 // Web Audio API Synthetic Piece Sound
-function playPieceSound() {
-    try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(150, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.1);
-        gain.gain.setValueAtTime(0.5, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.1);
-    } catch (e) {}
-}
 
 // Modal Handlers
 function openModal() {
@@ -885,5 +878,6 @@ async function saveConfig() {
 
     closeModal();
 
+    previousFen = null;
     updateUI(await arena.reset(redConfig, blackConfig));
 }

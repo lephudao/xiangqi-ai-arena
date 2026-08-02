@@ -115,10 +115,65 @@ export function ucciToPos(square) {
 }
 
 /**
+ * Mũi tên từ ô xuất phát tới ô đích của nước vừa đi.
+ *
+ * Đây là thứ rõ ràng nhất cho người xem video: quân cờ Trung Hoa trông na ná nhau, và khi
+ * trận chạy nhanh thì chỉ highlight hai đầu là không đủ để mắt bắt kịp quân nào vừa di
+ * chuyển. Mũi tên nói thẳng hướng đi.
+ *
+ * Vẽ bằng SVG riêng chồng lên bàn cờ, dùng chung hệ toạ độ viewBox với lưới.
+ */
+function drawMoveArrow(boardElement, from, to) {
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('class', 'move-arrow');
+    svg.setAttribute('viewBox', `0 0 ${BOARD.WIDTH} ${BOARD.HEIGHT}`);
+    svg.setAttribute('preserveAspectRatio', 'none');
+
+    const x1 = gridX(from.col);
+    const y1 = gridY(from.row);
+    const x2 = gridX(to.col);
+    const y2 = gridY(to.row);
+
+    // Lùi hai đầu khỏi tâm quân cờ để mũi tên không che mặt chữ Hán.
+    // Nhưng lùi cố định 21 đơn vị thì nước đi một ô (dài ~53) chỉ còn 11 đơn vị — gần như
+    // không thấy. Giới hạn phần lùi ở 30% mỗi đầu để nước ngắn vẫn ra hình mũi tên.
+    const length = Math.hypot(x2 - x1, y2 - y1) || 1;
+    const unitX = (x2 - x1) / length;
+    const unitY = (y2 - y1) / length;
+    const trim = Math.min(21, length * 0.3);
+    const startX = x1 + unitX * trim;
+    const startY = y1 + unitY * trim;
+    const endX = x2 - unitX * trim;
+    const endY = y2 - unitY * trim;
+
+    const shaft = document.createElementNS(SVG_NS, 'line');
+    shaft.setAttribute('x1', startX);
+    shaft.setAttribute('y1', startY);
+    shaft.setAttribute('x2', endX);
+    shaft.setAttribute('y2', endY);
+    shaft.setAttribute('class', 'move-arrow-shaft');
+
+    // Đầu mũi tên vẽ tay bằng polygon: marker-end của SVG không co giãn theo stroke-width
+    // một cách nhất quán giữa các trình duyệt.
+    const HEAD = 13;
+    const WING = 7;
+    const head = document.createElementNS(SVG_NS, 'polygon');
+    head.setAttribute('points', [
+        `${endX},${endY}`,
+        `${endX - unitX * HEAD - unitY * WING},${endY - unitY * HEAD + unitX * WING}`,
+        `${endX - unitX * HEAD + unitY * WING},${endY - unitY * HEAD - unitX * WING}`,
+    ].join(' '));
+    head.setAttribute('class', 'move-arrow-head');
+
+    svg.append(shaft, head);
+    boardElement.appendChild(svg);
+}
+
+/**
  * Vẽ lại toàn bộ quân cờ từ FEN, highlight ô đi và ô đến của nước vừa đi.
  */
 export function renderPieces(boardElement, fen, lastMove) {
-    boardElement.querySelectorAll('.piece, .move-marker').forEach(node => node.remove());
+    boardElement.querySelectorAll('.piece, .move-marker, .move-arrow').forEach(n => n.remove());
 
     let from = null;
     let to = null;
@@ -136,6 +191,8 @@ export function renderPieces(boardElement, fen, lastMove) {
         marker.style.top = `${point.top}%`;
         boardElement.appendChild(marker);
     }
+
+    if (from && to) drawMoveArrow(boardElement, from, to);
 
     const rows = fen.split(' ')[0].split('/');
     rows.forEach((rowString, row) => {

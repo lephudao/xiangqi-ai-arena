@@ -1067,33 +1067,64 @@ body.human-turn .xiangqi-board { cursor: pointer; }
     background: rgba(56, 189, 248, 0.08);
     border-left: 3px solid rgba(56, 189, 248, 0.5);
 }
+/* Lưới cố định 4 cột thay vì flex-wrap: với flex, ô nhập giành hết chỗ và đẩy nút Lưu
+   cùng liên kết "lấy key" rớt xuống dòng dưới, trông như giao diện bị vỡ. */
 .key-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(96px, 128px) minmax(0, 1fr) auto auto;
+    grid-template-areas: "provider input status action";
     align-items: center;
-    gap: 8px;
-    margin-bottom: 7px;
-    flex-wrap: wrap;
+    gap: 6px 8px;
+    margin-bottom: 6px;
 }
 .key-provider {
-    flex: 0 0 130px;
-    font-size: 0.84rem;
+    grid-area: provider;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
+/* Kế thừa cùng kiểu với các ô nhập khác trong hộp thoại. Ô này nằm ngoài .form-group nên
+   không tự nhận kiểu, và để mặc định thì nó ra nền TRẮNG giữa giao diện tối. */
 .key-input {
-    flex: 1 1 170px;
+    grid-area: input;
     min-width: 0;
+    font-size: 0.82rem;
+    padding: 6px 9px;
+    background: #0f172a;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: white;
+    outline: none;
 }
+.key-input:focus { border-color: #38bdf8; }
+.key-input::placeholder { color: rgba(226, 232, 240, 0.35); }
+.key-row .btn-small { grid-area: action; }
+/* Liên kết "lấy key" chỉ hiện khi CHƯA có key — có key rồi thì nó chỉ làm rối mắt */
+.key-row .key-help { display: none; }
+.key-row:has(.key-status.missing) .key-help {
+    display: inline;
+    grid-area: status;
+    justify-self: end;
+}
+.key-row:has(.key-status.missing) .key-status { display: none; }
 .key-status {
-    flex: 0 0 auto;
-    font-size: 0.76rem;
+    grid-area: status;
+    justify-self: end;
+    font-size: 0.74rem;
     opacity: 0.85;
     white-space: nowrap;
 }
 .key-status.missing { opacity: 0.6; }
+/* Liên kết mặc định của trình duyệt là xanh đậm — trên nền tối gần như không đọc được */
 .key-help {
     font-size: 0.74rem;
-    opacity: 0.6;
+    color: #7dd3fc;
+    opacity: 0.75;
     white-space: nowrap;
+    text-decoration: none;
 }
+.key-help:hover { opacity: 1; text-decoration: underline; }
 .btn-small {
     padding: 4px 10px;
     font-size: 0.76rem;
@@ -1110,3 +1141,84 @@ body.human-turn .xiangqi-board { cursor: pointer; }
     opacity: 0.7;
     margin-left: 6px;
 }
+
+/* ===== Nước vừa đi: mũi tên + nhấn mạnh ===== */
+/* Trận chạy nhanh, quân cờ Trung Hoa lại na ná nhau — chỉ tô sáng hai đầu là mắt không
+   bắt kịp quân nào vừa di chuyển. Mũi tên nói thẳng hướng đi. */
+.move-arrow {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 12;
+    pointer-events: none;
+    animation: arrow-in 0.34s ease-out;
+}
+.move-arrow-shaft {
+    stroke: #f59e0b;
+    stroke-width: 5;
+    stroke-linecap: round;
+    opacity: 0.85;
+}
+.move-arrow-head {
+    fill: #f59e0b;
+    opacity: 0.95;
+}
+@keyframes arrow-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* Quân vừa đi: nhịp đập tắt dần, đủ để bắt mắt nhưng không nhấp nháy suốt trận */
+.piece.last-move {
+    animation: landed 1.1s ease-out;
+}
+@keyframes landed {
+    0%   { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.85), inset 0 2px 4px rgba(255,255,255,0.6); }
+    45%  { box-shadow: 0 0 26px 8px rgba(245, 158, 11, 0.75), inset 0 2px 4px rgba(255,255,255,0.6); }
+    100% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.9), inset 0 2px 4px rgba(255,255,255,0.6); }
+}
+
+/* Ô xuất phát mờ dần đi, để trọng tâm dồn về ô đích */
+.move-marker { animation: origin-fade 1.1s ease-out; }
+@keyframes origin-fade {
+    0%   { opacity: 1; transform: translate(-50%, -50%) scale(1.35); }
+    100% { opacity: 0.75; transform: translate(-50%, -50%) scale(1); }
+}
+
+/* ===== Hộp thoại cấu hình: gọn lại để không phải cuộn nhiều ===== */
+.modal-content .config-box { padding: 12px 14px; margin-bottom: 12px; }
+.modal-content .form-group { margin-bottom: 9px; }
+.modal-content .form-group label {
+    font-size: 0.78rem;
+    opacity: 0.75;
+    margin-bottom: 3px;
+    display: block;
+}
+
+/* ===== Thanh điều khiển dưới: xuống dòng theo NHÓM thay vì bẻ chữ ===== */
+/* Ở màn hình 1280px, flex một hàng làm nhãn bị bẻ giữa chừng ("Tự / Động / Đấu"),
+   trông như giao diện hỏng. Cho phép cả thanh xuống dòng, và cấm bẻ chữ trong từng nhãn. */
+.studio-footer {
+    flex-wrap: wrap;
+    gap: 10px 16px;
+}
+.controls-left, .controls-right {
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.studio-footer .btn,
+.cost-label, .cost-value, .cost-extra,
+.budget-input span, .speed-selector span {
+    white-space: nowrap;
+}
+/* Nhãn phụ nhỏ lại để nhường chỗ cho nút bấm — đây là thứ hay dùng nhất */
+.budget-input, .speed-selector {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    opacity: 0.85;
+}
+.budget-input input { width: 74px; }
+.studio-footer select { font-size: 0.8rem; padding: 5px 8px; }
