@@ -22,18 +22,18 @@ class ServerArena {
     }
 
     async getState() {
-        return (await fetch("/api/state")).json();
+        return (await fetch("api/state")).json();
     }
 
     async step() {
-        return (await fetch("/api/step", { method: "POST" })).json();
+        return (await fetch("api/step", { method: "POST" })).json();
     }
 
     async reset(redConfig, blackConfig) {
         const body = redConfig
             ? JSON.stringify({ red_config: redConfig, black_config: blackConfig })
             : null;
-        const response = await fetch("/api/reset", {
+        const response = await fetch("api/reset", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body,
@@ -42,7 +42,7 @@ class ServerArena {
     }
 
     async submitHumanMove(ucci) {
-        const response = await fetch("/api/human-move", {
+        const response = await fetch("api/human-move", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ ucci }),
@@ -54,22 +54,22 @@ class ServerArena {
     }
 
     async requestHint() {
-        const response = await fetch("/api/hint", { method: "POST" });
+        const response = await fetch("api/hint", { method: "POST" });
         const data = await response.json();
         return response.ok ? { ok: true, ...data } : { ok: false, error: data.error };
     }
 
     async listModels() {
-        return (await fetch("/api/models")).json();
+        return (await fetch("api/models")).json();
     }
 
     async leaderboard() {
-        const { leaderboard } = await (await fetch("/api/leaderboard")).json();
+        const { leaderboard } = await (await fetch("api/leaderboard")).json();
         return leaderboard;
     }
 
     async listTtsModels() {
-        const { tts_models: models } = await (await fetch("/api/models")).json();
+        const { tts_models: models } = await (await fetch("api/models")).json();
         return models ?? [];
     }
 }
@@ -163,7 +163,7 @@ class BrowserArena {
 export async function createArenaClient(onProgress = () => {}) {
     let capabilities = null;
     try {
-        const response = await fetch("/api/capabilities");
+        const response = await fetch("api/capabilities");
         if (response.ok) capabilities = await response.json();
     } catch {
         // Không có máy chủ -> bản tĩnh. Đây là đường đi bình thường của bản online.

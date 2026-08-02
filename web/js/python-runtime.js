@@ -9,8 +9,15 @@
  * không phụ thuộc CDN nào.
  */
 
-const PYODIDE_DIR = "/vendor/pyodide/";
-const ENGINE_BUNDLE = "/vendor/engine-core.zip";
+// Gốc site tính từ vị trí CHÍNH FILE NÀY (web/js/ -> web/), không phải từ gốc tên miền.
+// GitHub Pages phục vụ ở đường dẫn con (/ten-repo/), nên đường dẫn tuyệt đối "/vendor/..."
+// sẽ trỏ ra gốc tên miền và trả 404.
+//
+// Phải dùng URL tuyệt đối cho cả hai: `import()` động phân giải theo URL của MODULE, còn
+// `fetch()` phân giải theo URL của TRANG — cùng một chuỗi tương đối sẽ ra hai nơi khác nhau.
+const SITE_ROOT = new URL("../", import.meta.url);
+const PYODIDE_DIR = new URL("vendor/pyodide/", SITE_ROOT).href;
+const ENGINE_BUNDLE = new URL("vendor/engine-core.zip", SITE_ROOT).href;
 
 // File .wasm gần 10MB. Tải trước để đo được tiến trình thật theo byte, rồi loadPyodide gọi
 // lại URL đó sẽ trúng cache của trình duyệt. Không làm vậy thì người dùng nhìn màn hình
