@@ -278,7 +278,7 @@ function renderReplayFrame(frame) {
     ['red', 'black'].forEach(sideKey => {
         const side = stats[sideKey];
         const accuracyEl = document.getElementById(`accuracy-${sideKey}`);
-        accuracyEl.textContent = side.accuracy === null
+        accuracyEl.textContent = side.accuracy == null
             ? 'Độ chính xác: —'
             : `Độ chính xác: ${side.accuracy}% · Blunder: ${side.blunders}`;
         const illegalEl = document.getElementById(`illegal-${sideKey}`);
@@ -607,7 +607,7 @@ function describeConfig(config) {
 function updateCostMeter(state) {
     const element = document.getElementById('cost-value');
     const cost = state.cost_total_usd;
-    if (cost === null || cost === undefined) {
+    if (cost == null) {
         element.textContent = '—';
         element.classList.remove('over-budget');
         return;
@@ -636,7 +636,9 @@ function updatePlayerStats(sideKey, stats) {
     document.getElementById(`latency-${sideKey}`).textContent = `Nghĩ: ${avgSeconds.toFixed(1)}s`;
 
     const accuracyEl = document.getElementById(`accuracy-${sideKey}`);
-    if (stats.accuracy === null) {
+    // == null bắt CẢ null lẫn undefined: Pyodide chuyển None của Python thành undefined,
+    // nên so sánh === null sẽ trượt và giao diện hiện "undefined%" ở bản online.
+    if (stats.accuracy == null) {
         accuracyEl.textContent = 'Độ chính xác: —';
     } else {
         accuracyEl.textContent = `Độ chính xác: ${stats.accuracy}% · Blunder: ${stats.blunders}`;
